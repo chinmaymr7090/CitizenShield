@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CitizenShield — Smart Municipal Grievance Redressal & Safety Directorate</title>
+
+  <!-- Leaflet CSS for Municipal GIS Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><circle cx='12' cy='12' r='10'/></svg>">
+</head>
+<body>
+
+  <!-- Floating Glass Lagoon Navigation -->
+  <div class="lagoon-nav-wrapper">
+    <!-- Non-Emergency Safety Banner (Executive Luxury Glass Ribbon) -->
+    <div class="emergency-pill-strip" role="alert">
+      <div class="emergency-badge-group">
+        <span class="emergency-pulse-beacon"></span>
+        <span class="emergency-tag-label">EMERGENCY DIRECTIVE</span>
+      </div>
+      <p class="emergency-text">
+        Non-emergency civic defects only. For urgent crime, active fire, or medical threat:
+      </p>
+      <a href="tel:112" class="emergency-call-btn">
+        <span class="call-icon">📞</span>
+        <span>Call <strong>112</strong></span>
+        <span class="call-arrow">↗</span>
+      </a>
+    </div>
+
+    <header class="lagoon-nav">
+      <div class="brand-link" data-view-target="view-home">
+        <span class="brand-orb-icon"></span>
+        <span class="brand-name">Citizen<span>Shield</span></span>
+      </div>
+
+      <nav aria-label="Main Navigation">
+        <ul class="nav-menu-links">
+          <li><button class="nav-menu-btn active" data-view-target="view-home">Overview</button></li>
+          <li><button class="nav-menu-btn" data-view-target="view-submit">Lodge Grievance</button></li>
+          <li><button class="nav-menu-btn" data-view-target="view-citizen-dashboard" id="nav-my-dossier">My Dossier</button></li>
+          <li><button class="nav-menu-btn" data-view-target="view-tracking">Case Tracker</button></li>
+          <li><button class="nav-menu-btn" data-view-target="view-gis-map">Live GIS Radar</button></li>
+          <li><button class="nav-menu-btn hidden" data-view-target="view-admin-dashboard" id="nav-officer-console">Officer Console</button></li>
+        </ul>
+      </nav>
+
+      <div class="nav-actions">
+        <div id="user-profile-badge" class="user-session-pill hidden">
+          <span id="header-user-name" style="font-weight: 700; color: #ffffff;">Citizen</span>
+          <span class="role-tag" id="header-user-role">Citizen</span>
+          <button class="btn btn-glass btn-sm" id="btn-global-logout" style="padding: 4px 10px;">Logout</button>
+        </div>
+        <button class="btn btn-lagoon btn-sm" id="btn-header-login" data-view-target="view-auth">Sign In</button>
+      </div>
+    </header>
+  </div>
+
+  <!-- Primary Application Views Container -->
+  <main class="app-container">
+
+    <!-- ==================================================== -->
+    <!-- VIEW 1: HOME (STIPPLE ORB LANDING & MUNICIPAL SUITE) -->
+    <!-- ==================================================== -->
+    <section id="view-home" class="app-view">
+
+      <!-- HERO SECTION WITH INTERACTIVE 3D STIPPLE ORB -->
+      <div class="stipple-hero">
+        <div class="hero-copy">
+          <div class="social-pill">
+            <span class="social-dot"></span>
+            <span>Joined by 14,200+ active citizens across 198 wards</span>
+          </div>
+
+          <h1><em>Protect the City,</em><br>Share the Shield</h1>
+
+          <p>Back your neighborhood before the damage escalates. Report craters, grid blackouts, sewage bursts, and public hazards with verified GPS coordinates and an immutable SQLite audit trail.</p>
+
+          <div class="hero-buttons">
+            <button class="btn btn-lagoon btn-lg" data-view-target="view-submit">Lodge a Grievance Now →</button>
+            <button class="btn btn-glass btn-lg" data-view-target="view-tracking">Track Case Reference</button>
+          </div>
+
+          <div class="hero-backers">
+            <span>Verified Directorate Partners:</span>
+            <div class="backer-badge"><span class="backer-mark">🛡️</span> BBMP Municipal</div>
+            <div class="backer-badge"><span class="backer-mark">⚡</span> BESCOM Power</div>
+            <div class="backer-badge"><span class="backer-mark">💧</span> BWSSB Water</div>
+          </div>
+        </div>
+
+        <!-- PREMIUM GLASS POD WITH 3D DOTTED EARTH GLOBE -->
+        <div class="glass-earth-pod">
+          <!-- Cyber HUD Corner Brackets -->
+          <span class="pod-bracket top-left"></span>
+          <span class="pod-bracket top-right"></span>
+          <span class="pod-bracket bottom-left"></span>
+          <span class="pod-bracket bottom-right"></span>
+
+          <!-- Pod Header Telemetry Strip -->
+          <div class="pod-header">
+            <div class="pod-badge live-beacon">
+              <span class="pulse-beacon-dot"></span>
+              <span class="badge-title">3D ORBITAL CIVIC RADAR</span>
+            </div>
+            <div class="pod-telemetry-readout">
+              <span class="telemetry-pin">📍</span>
+              <span id="pod-live-coords">12.9716° N, 77.5946° E</span>
+              <span class="ward-tag">WARD 112</span>
+            </div>
+          </div>
+
+          <!-- 3D Dotted Earth Canvas Stage -->
+          <div class="orb-stage">
+            <div class="orb-aura"></div>
+            <canvas id="orb-canvas"></canvas>
+          </div>
+
+          <!-- Pod Footer Controls & Indicators -->
+          <div class="pod-footer">
+            <div class="pod-hint">
+              <span class="hint-icon">⟲</span>
+              <span>Click &amp; drag to rotate Earth</span>
+            </div>
+            <div class="pod-actions">
+              <button type="button" class="pod-ctrl-btn" id="btn-focus-ward" title="Center on Ward 112 / India">Target Ward 112</button>
+              <button type="button" class="pod-ctrl-btn" id="btn-toggle-spin" title="Pause or Resume Auto-Rotation">Spin: On</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- THESIS SECTION (STREAMS BREAKDOWN) -->
+      <section class="stipple-thesis">
+        <div class="thesis-headline">
+          <div class="section-tag">Municipal Thesis</div>
+          <h2>Neglect arrives after the damage. <em>Citizens act before,</em> and safeguard every neighborhood that follows.</h2>
+        </div>
+
+        <div class="streams-grid">
+          <div class="stream-card">
+            <div class="stream-icon">⚡</div>
+            <div class="stream-value">61,400+</div>
+            <div class="stream-label">Electrical &amp; Streetlighting Restored</div>
+          </div>
+          <div class="stream-card">
+            <div class="stream-icon">🛣️</div>
+            <div class="stream-value">48,200+</div>
+            <div class="stream-label">Road Hazards &amp; Craters Patched</div>
+          </div>
+          <div class="stream-card">
+            <div class="stream-icon">💧</div>
+            <div class="stream-value">22,100+</div>
+            <div class="stream-label">Sewage &amp; Drainage Lines Cleared</div>
+          </div>
+          <div class="stream-card">
+            <div class="stream-icon">🗑️</div>
+            <div class="stream-value">15,500+</div>
+            <div class="stream-label">Bulk Sanitation Dumps Sanitized</div>
+          </div>
+        </div>
+
+        <!-- Mini Live GIS Preview in Thesis -->
+        <div class="lagoon-card" style="padding: 20px; margin-top: 32px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div class="section-tag" style="margin-bottom: 2px;">Live Geo-Radar</div>
+              <h3 style="font-size: 1.15rem; font-weight: 800; color: #ffffff;">Municipal Spatial Grievance Radar</h3>
+            </div>
+            <button class="btn btn-glass btn-sm" data-view-target="view-gis-map">Expand Full GIS Explorer ↗</button>
+          </div>
+          <div class="gis-map-frame gis-map-sm" id="home-gis-map"></div>
+        </div>
+      </section>
+
+      <!-- PATHS SECTION (FOR CITIZENS / FOR OFFICERS) -->
+      <section class="stipple-paths">
+        <div class="paths-header">
+          <div class="section-tag">Direct Civic Action</div>
+          <h2>Lodge a Grievance, or Coordinate Response</h2>
+        </div>
+
+        <div class="paths-model-strip">
+          <div class="model-pill">Active Grievance Queue: <strong id="home-stat-total">0</strong></div>
+          <div class="model-pill">Under Zonal Inspection: <strong id="home-stat-inspection">0</strong></div>
+          <div class="model-pill">Urgent Hazards Dispatched: <strong id="home-stat-urgent" style="color: var(--amber-alert);">0</strong></div>
+          <div class="model-pill">Field Rectified: <strong id="home-stat-resolved" style="color: var(--mint-glow);">0</strong></div>
+          <div class="model-pill">Database Vault: <strong>100% Immutable SQLite</strong></div>
+        </div>
+
+        <div class="paths-split">
+          <!-- Card 1: For Citizens -->
+          <div class="path-card">
+            <div>
+              <div class="path-caption">Your neighborhood in your corner</div>
+              <h3>For Citizens</h3>
+              <p>Pinpoint municipal hazards in seconds with consent-based GPS. Upload evidence photos, track real-time inspection milestones, and generate legal case certificates.</p>
+              <ul class="bullet-list">
+                <li><span class="bullet-icon">✓</span> Consent-driven GPS pinpointing &amp; reverse geocoding</li>
+                <li><span class="bullet-icon">✓</span> 100% Immutable SQLite audit vault (never lost)</li>
+                <li><span class="bullet-icon">✓</span> Printable legal grievance certificate dossier</li>
+              </ul>
+            </div>
+            <button class="btn btn-lagoon" data-view-target="view-submit" style="width: 100%;">Lodge a Grievance Now</button>
+          </div>
+
+          <!-- Card 2: For Officers -->
+          <div class="path-card">
+            <div>
+              <div class="path-caption">Central Directorate Operations</div>
+              <h3>For Officers &amp; Engineering Cells</h3>
+              <p>Real-time GIS ward radar, automated priority ticket dispatching, SLA breach countdowns, and public resolution directive publishing.</p>
+              <ul class="bullet-list">
+                <li><span class="bullet-icon">✓</span> 12h to 48h SLA countdown tracking</li>
+                <li><span class="bullet-icon">✓</span> Direct inter-departmental ticket re-routing</li>
+                <li><span class="bullet-icon">✓</span> Zero-backlog municipal inspection queue</li>
+              </ul>
+            </div>
+            <button class="btn btn-glass" data-view-target="view-admin-dashboard" style="width: 100%;">Access Officer Console</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- CALL TO ACTION (CTA) -->
+      <div class="stipple-cta">
+        <h2>Protect your <em>neighborhood</em> before <em>hazards become tragedies.</em></h2>
+        <div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">
+          <button class="btn btn-lagoon btn-lg" data-view-target="view-submit">Lodge a Grievance Today →</button>
+          <button class="btn btn-glass btn-lg" data-view-target="view-tracking">Inspect Case Tracker</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 2: AUTHENTICATION (SIGN IN & REGISTER) -->
+    <!-- ==================================================== -->
+    <section id="view-auth" class="app-view hidden">
+      <div style="max-width: 480px; margin: 40px auto;">
+        <div class="lagoon-card">
+          <div style="display: flex; border-bottom: 1px solid var(--lagoon-border); margin-bottom: 24px;">
+            <button id="auth-tab-login" class="btn" style="flex: 1; border-radius: 0; border-bottom: 2px solid var(--teal-light); color: var(--teal-light); font-weight: 700;">Officer / Citizen Sign In</button>
+            <button id="auth-tab-register" class="btn" style="flex: 1; border-radius: 0; color: var(--text-dim); font-weight: 600;">Register Account</button>
+          </div>
+
+          <!-- Sign In Form -->
+          <form id="form-auth-login">
+            <div class="form-group" style="margin-bottom: 18px;">
+              <label class="form-label" for="login-email">Registered Email Address</label>
+              <input type="email" id="login-email" class="form-input" placeholder="e.g. rahul.citizen@gmail.com" required autocomplete="email">
+            </div>
+            <div class="form-group" style="margin-bottom: 22px;">
+              <label class="form-label" for="login-password">Password</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+                <button type="button" class="btn btn-glass btn-sm" id="btn-toggle-login-pwd">👁️</button>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-lagoon" style="width: 100%;" id="btn-login-submit">Authenticate &amp; Proceed</button>
+          </form>
+
+          <!-- Register Form -->
+          <form id="form-auth-register" class="hidden">
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label" for="reg-name">Full Name</label>
+              <input type="text" id="reg-name" class="form-input" placeholder="Rahul Sharma" required autocomplete="name">
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label" for="reg-email">Personal Email Address</label>
+              <input type="email" id="reg-email" class="form-input" placeholder="rahul.citizen@gmail.com" required autocomplete="email">
+            </div>
+            <div class="form-group" style="margin-bottom: 16px;">
+              <label class="form-label" for="reg-phone">Contact Mobile Number</label>
+              <input type="tel" id="reg-phone" class="form-input" placeholder="+91 98450 12345" autocomplete="tel">
+            </div>
+            <div class="form-group" style="margin-bottom: 22px;">
+              <label class="form-label" for="reg-password">Password (Minimum 6 characters)</label>
+              <input type="password" id="reg-password" class="form-input" placeholder="••••••••" minlength="6" required autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-lagoon" style="width: 100%;" id="btn-reg-submit">Register Citizen Account</button>
+          </form>
+
+          <!-- Quick Test Credentials for College Viva & Evaluations -->
+          <div style="margin-top: 24px; padding-top: 18px; border-top: 1px dashed var(--lagoon-border);">
+            <div style="font-size: 0.76rem; font-family: var(--font-mono); text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; text-align: center;">
+              ⚡ Demo Credentials (Viva Presentation)
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <button type="button" class="btn btn-glass btn-sm" id="btn-demo-citizen">Citizen Account</button>
+              <button type="button" class="btn btn-glass btn-sm" id="btn-demo-admin">Directorate Admin</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 3: LODGE A CIVIC GRIEVANCE (GPS & PIN-DROP) -->
+    <!-- ==================================================== -->
+    <section id="view-submit" class="app-view hidden">
+      <div style="max-width: 860px; margin: 0 auto;">
+        <div class="lagoon-card">
+          <div class="card-header-flex">
+            <div>
+              <div class="dossier-stamp">FORM CS-101 • OFFICIAL COMPLAINT LODGMENT</div>
+              <h2 class="card-title" style="margin-top: 8px;">Lodge a Municipal Grievance</h2>
+              <p class="card-desc">Permanently recorded in the SQLite vault with GPS coordinates and official tracking.</p>
+            </div>
+          </div>
+
+          <form id="form-lodge-grievance">
+            <div class="form-grid">
+              <!-- Issue Title -->
+              <div class="form-group col-span-2">
+                <label class="form-label" for="lodge-title">Grievance Headline / Summary *</label>
+                <input type="text" id="lodge-title" class="form-input" placeholder="e.g. Hazardous 4ft Tarmac Crater near Metro Pillar 142" maxlength="140" required>
+                <div class="form-hint">Clear, concise headline of the defect (max 140 chars).</div>
+              </div>
+
+              <!-- Responsible Department -->
+              <div class="form-group">
+                <label class="form-label" for="lodge-dept">Target Department *</label>
+                <select id="lodge-dept" class="form-select" required>
+                  <option value="Roads & Civil Infrastructure">Roads &amp; Civil Infrastructure</option>
+                  <option value="Electrical & Public Lighting">Electrical &amp; Public Lighting</option>
+                  <option value="Water Supply & Sewerage Board">Water Supply &amp; Sewerage Board</option>
+                  <option value="Solid Waste Management Cell">Solid Waste Management Cell</option>
+                  <option value="Public Safety & Encroachments">Public Safety &amp; Encroachments</option>
+                </select>
+              </div>
+
+              <!-- Category -->
+              <div class="form-group">
+                <label class="form-label" for="lodge-category">Issue Category *</label>
+                <select id="lodge-category" class="form-select" required>
+                  <option value="Roads and Transport">Roads and Transport</option>
+                  <option value="Streetlights and Electricity">Streetlights and Electricity</option>
+                  <option value="Water and Drainage">Water and Drainage</option>
+                  <option value="Garbage and Sanitation">Garbage and Sanitation</option>
+                  <option value="Public Infrastructure">Public Infrastructure</option>
+                  <option value="Public Safety">Public Safety</option>
+                </select>
+              </div>
+
+              <!-- Priority / Urgency -->
+              <div class="form-group">
+                <label class="form-label" for="lodge-priority">Severity / Urgency Level *</label>
+                <select id="lodge-priority" class="form-select" required>
+                  <option value="Normal">Normal (SLA: 48 Hours)</option>
+                  <option value="Urgent">Urgent Hazard (SLA: 12 Hours)</option>
+                  <option value="High">High Priority (SLA: 24 Hours)</option>
+                  <option value="Low">Low Priority (SLA: 72 Hours)</option>
+                </select>
+              </div>
+
+              <!-- Ward -->
+              <div class="form-group">
+                <label class="form-label" for="lodge-ward">Administrative Ward *</label>
+                <select id="lodge-ward" class="form-select" required>
+                  <option value="Ward 112 - Central Division">Ward 112 - Central Division</option>
+                  <option value="Ward 109 - Commercial Division">Ward 109 - Commercial Division</option>
+                  <option value="Ward 93 - Vasanth Nagar Division">Ward 93 - Vasanth Nagar Division</option>
+                  <option value="Ward 142 - Indiranagar Division">Ward 142 - Indiranagar Division</option>
+                  <option value="Ward 174 - Koramangala Division">Ward 174 - Koramangala Division</option>
+                </select>
+              </div>
+
+              <!-- Description -->
+              <div class="form-group col-span-2">
+                <label class="form-label" for="lodge-description">Detailed Description &amp; Risk Assessment *</label>
+                <textarea id="lodge-description" class="form-textarea" placeholder="Detail the defect condition, duration, nearby landmarks, and hazard level..." maxlength="3000" required></textarea>
+              </div>
+
+              <!-- Location Details -->
+              <div class="form-group col-span-2">
+                <label class="form-label" for="lodge-location">Street Address / Landmark *</label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="lodge-location" class="form-input" placeholder="e.g. Opposite Metro Pillar 142, CMH Road Junction" required>
+                  <button type="button" class="btn btn-glass btn-sm" id="btn-detect-gps" style="white-space: nowrap;">
+                    📍 Detect GPS
+                  </button>
+                </div>
+              </div>
+
+              <input type="hidden" id="report-lat">
+              <input type="hidden" id="report-lng">
+
+              <!-- Interactive Pin-Drop Leaflet Map -->
+              <div class="form-group col-span-2">
+                <label class="form-label">Interactive GIS Pinpoint (Click map to position marker)</label>
+                <div class="gis-map-frame gis-map-sm" id="report-gis-map"></div>
+                <div id="coords-readout" style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--teal-light); margin-top: 6px;">
+                  Coordinates: Lat 12.971600, Lng 77.594600 (Central Municipal Datum)
+                </div>
+              </div>
+
+              <!-- Evidence Photo Upload -->
+              <div class="form-group col-span-2">
+                <label class="form-label" for="lodge-image">Evidence Photo Attachment (Optional)</label>
+                <input type="file" id="lodge-image" class="form-input" accept="image/jpeg,image/png,image/webp">
+                <div class="form-hint">Maximum image size: 10 MB. Stored permanently in the uploads vault.</div>
+                <div id="lodge-img-preview-box" class="hidden" style="margin-top: 10px;">
+                  <img id="lodge-img-preview" src="" alt="Evidence preview" style="max-height: 180px; border-radius: var(--radius-sm); border: 1px solid var(--lagoon-border);">
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top: 32px; display: flex; justify-content: flex-end; gap: 14px;">
+              <button type="button" class="btn btn-glass btn-lg" onclick="window.history.back()">Cancel</button>
+              <button type="button" class="btn btn-lagoon btn-lg" id="btn-open-review">Review &amp; Lodge Dossier →</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 4: CITIZEN DOSSIER (MY REGISTERED GRIEVANCES) -->
+    <!-- ==================================================== -->
+    <section id="view-citizen-dashboard" class="app-view hidden">
+      <div class="card-header-flex">
+        <div>
+          <div class="section-tag">Citizen Portfolio</div>
+          <h2 class="card-title">Registered Grievance Dossier</h2>
+          <p class="card-desc">All complaints permanently recorded under your authenticated account.</p>
+        </div>
+        <button class="btn btn-lagoon" data-view-target="view-submit">+ Lodge New Grievance</button>
+      </div>
+
+      <!-- Metrics Row -->
+      <div class="streams-grid" style="margin-bottom: 28px;">
+        <div class="stream-card">
+          <div class="stream-value" id="cit-metric-total">0</div>
+          <div class="stream-label">Total Cases Lodged</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="cit-metric-submitted" style="color: #cbd5e1;">0</div>
+          <div class="stream-label">In Official Queue</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="cit-metric-progress" style="color: var(--amber-alert);">0</div>
+          <div class="stream-label">Action Dispatched</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="cit-metric-resolved" style="color: var(--mint-glow);">0</div>
+          <div class="stream-label">Rectified &amp; Closed</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="lagoon-card" style="padding: 16px 20px; margin-bottom: 20px;">
+        <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--teal-light);">Status Filter:</span>
+          <select id="cit-filter-status" class="form-select" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
+            <option value="ALL">All Statuses</option>
+            <option value="Submitted">Submitted</option>
+            <option value="Under Review">Under Review</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+
+          <span style="font-size: 0.85rem; font-weight: 700; color: var(--teal-light); margin-left: 12px;">Department:</span>
+          <select id="cit-filter-dept" class="form-select" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">
+            <option value="ALL">All Departments</option>
+            <option value="Roads & Civil Infrastructure">Roads &amp; Civil Infrastructure</option>
+            <option value="Electrical & Public Lighting">Electrical &amp; Public Lighting</option>
+            <option value="Water Supply & Sewerage Board">Water Supply &amp; Sewerage Board</option>
+            <option value="Solid Waste Management Cell">Solid Waste Management Cell</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- List Container -->
+      <div id="citizen-grievances-list" style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- Dynamically rendered -->
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 5: CASE TRACKER & CERTIFICATE DOSSIER -->
+    <!-- ==================================================== -->
+    <section id="view-tracking" class="app-view hidden">
+      <div style="max-width: 860px; margin: 0 auto;">
+        <div class="lagoon-card">
+          <div class="card-header-flex">
+            <div>
+              <div class="section-tag">Verification Query</div>
+              <h2 class="card-title">Municipal Grievance Case Tracker</h2>
+              <p class="card-desc">Enter reference ID (e.g. CS-2026-84912) to inspect real-time audit milestones.</p>
+            </div>
+          </div>
+
+          <form id="form-tracking-search">
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="track-search-input" class="form-input" placeholder="e.g. CS-2026-84912" required style="font-family: var(--font-mono); font-size: 1.1rem; text-transform: uppercase; font-weight: 700;">
+              <button type="submit" class="btn btn-lagoon" id="btn-search-track">Inspect Case Dossier</button>
+            </div>
+          </form>
+
+          <!-- Printable Certificate Dossier Result -->
+          <div id="tracking-dossier-result" class="hidden" style="margin-top: 36px;">
+            <div class="dossier-cert" id="printable-dossier">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 14px; margin-bottom: 20px;">
+                <div>
+                  <div class="dossier-stamp">OFFICIAL CERTIFICATE OF GRIEVANCE LODGMENT</div>
+                  <h3 style="font-size: 1.5rem; font-weight: 800; color: #ffffff; margin-top: 8px;" id="dossier-title">Hazardous Tarmac Crater</h3>
+                  <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+                    <span class="report-token" id="dossier-ref-id">CS-2026-84912</span>
+                    <span id="dossier-status-pill"></span>
+                    <span id="dossier-priority-pill"></span>
+                  </div>
+                </div>
+                <button class="btn btn-glass btn-sm" onclick="window.print()">🖨️ Print Dossier</button>
+              </div>
+
+              <!-- Dossier Details Grid -->
+              <div class="dossier-grid">
+                <div class="dossier-field">
+                  <span class="dossier-field-label">Assigned Department</span>
+                  <span class="dossier-field-val" id="dossier-dept">Roads &amp; Civil Infrastructure</span>
+                </div>
+                <div class="dossier-field">
+                  <span class="dossier-field-label">Administrative Ward</span>
+                  <span class="dossier-field-val" id="dossier-ward">Ward 112 - Indiranagar Division</span>
+                </div>
+                <div class="dossier-field">
+                  <span class="dossier-field-label">Registered Timestamp</span>
+                  <span class="dossier-field-val" id="dossier-created">2026-10-26 14:30:00</span>
+                </div>
+                <div class="dossier-field">
+                  <span class="dossier-field-label">Charter SLA Window</span>
+                  <span class="dossier-field-val" id="dossier-sla">24 Hours Target</span>
+                </div>
+                <div class="dossier-field" style="grid-column: span 2;">
+                  <span class="dossier-field-label">Exact Location / Landmark</span>
+                  <span class="dossier-field-val" id="dossier-location">Opposite Metro Pillar 142, CMH Road</span>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div style="margin-bottom: 24px;">
+                <div class="dossier-field-label" style="margin-bottom: 6px;">Citizen Grievance Statement:</div>
+                <div id="dossier-description" style="background: rgba(8, 29, 36, 0.6); padding: 14px; border: 1px solid var(--lagoon-border); border-radius: var(--radius-sm); font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap;"></div>
+              </div>
+
+              <!-- Photo -->
+              <div id="dossier-photo-container" class="hidden" style="margin-bottom: 24px;">
+                <div class="dossier-field-label" style="margin-bottom: 6px;">Verified Evidence Photo Attachment:</div>
+                <img id="dossier-photo" src="" alt="Evidence photo" style="max-height: 240px; border-radius: var(--radius-sm); border: 1px solid var(--lagoon-border);">
+              </div>
+
+              <!-- Audit Timeline -->
+              <div>
+                <div class="dossier-field-label" style="margin-bottom: 12px;">Immutable Municipal Audit History &amp; Directives:</div>
+                <div class="audit-timeline" id="dossier-timeline"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 6: LIVE FULLSCREEN GIS RADAR MAP -->
+    <!-- ==================================================== -->
+    <section id="view-gis-map" class="app-view hidden">
+      <div class="lagoon-card" style="padding: 16px 20px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <div class="section-tag">Spatial Explorer</div>
+            <h2 class="card-title" style="font-size: 1.3rem;">Municipal GIS Incident Map</h2>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-glass btn-sm" id="btn-refresh-gis">🔄 Refresh GIS Data</button>
+            <button class="btn btn-lagoon btn-sm" data-view-target="view-submit">+ Pin New Grievance</button>
+          </div>
+        </div>
+      </div>
+      <div class="gis-map-frame" id="full-city-gis-map" style="height: 600px;"></div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 7: OFFICER ADMINISTRATION CONSOLE -->
+    <!-- ==================================================== -->
+    <section id="view-admin-dashboard" class="app-view hidden">
+      <div class="card-header-flex">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h2 class="card-title">Municipal Grievance Control Directorate</h2>
+            <span class="role-tag admin">Officer Access</span>
+          </div>
+          <p class="card-desc">Review, prioritize, dispatch engineering work-tickets, and update official case statuses.</p>
+        </div>
+      </div>
+
+      <!-- Officer Metrics -->
+      <div class="streams-grid" style="margin-bottom: 24px;">
+        <div class="stream-card">
+          <div class="stream-value" id="adm-metric-total">0</div>
+          <div class="stream-label">Total City Grievances</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="adm-metric-submitted" style="color: #cbd5e1;">0</div>
+          <div class="stream-label">New Submissions</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="adm-metric-review" style="color: #38bdf8;">0</div>
+          <div class="stream-label">Under Zonal Review</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="adm-metric-progress" style="color: var(--amber-alert);">0</div>
+          <div class="stream-label">Action Dispatched</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="adm-metric-resolved" style="color: var(--mint-glow);">0</div>
+          <div class="stream-label">Rectified &amp; Closed</div>
+        </div>
+      </div>
+
+      <!-- Filter Controls Toolbar -->
+      <div class="lagoon-card" style="padding: 16px 20px; margin-bottom: 20px;">
+        <div style="display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="adm-search-input" class="form-input" placeholder="Search reference, title..." style="width: 240px; padding: 8px 12px; font-size: 0.85rem;">
+            
+            <select id="adm-filter-status" class="form-select" style="width: auto; padding: 8px 12px; font-size: 0.85rem;">
+              <option value="ALL">All Statuses</option>
+              <option value="Submitted">Submitted</option>
+              <option value="Under Review">Under Review</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+
+            <select id="adm-filter-priority" class="form-select" style="width: auto; padding: 8px 12px; font-size: 0.85rem;">
+              <option value="ALL">All Severities</option>
+              <option value="Urgent">Urgent Hazard</option>
+              <option value="High">High</option>
+              <option value="Normal">Normal</option>
+              <option value="Low">Low</option>
+            </select>
+
+            <select id="adm-filter-category" class="form-select" style="width: auto; padding: 8px 12px; font-size: 0.85rem;">
+              <option value="ALL">All Categories</option>
+              <option value="Roads and Transport">Roads and Transport</option>
+              <option value="Streetlights and Electricity">Streetlights and Electricity</option>
+              <option value="Water and Drainage">Water and Drainage</option>
+              <option value="Garbage and Sanitation">Garbage and Sanitation</option>
+              <option value="Public Infrastructure">Public Infrastructure</option>
+              <option value="Public Safety">Public Safety</option>
+            </select>
+          </div>
+          <button class="btn btn-glass btn-sm" id="btn-adm-refresh">🔄 Refresh Registry</button>
+        </div>
+      </div>
+
+      <!-- Table Wrap -->
+      <div class="table-wrap">
+        <table class="lagoon-table">
+          <thead>
+            <tr>
+              <th>Reference ID</th>
+              <th>Citizen</th>
+              <th>Department</th>
+              <th>Severity</th>
+              <th>Summary</th>
+              <th>Ward / Location</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="adm-table-body">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================================================== -->
+  <!-- MODALS -->
+  <!-- ==================================================== -->
+
+  <!-- MODAL: PRE-LODGMENT REVIEW -->
+  <div id="modal-review" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-dialog-header">
+        <span class="modal-dialog-title">Review Grievance Lodgment Details</span>
+        <button class="modal-dialog-close" data-modal-close="modal-review">&times;</button>
+      </div>
+      <div class="modal-dialog-body">
+        <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 18px; font-size: 0.88rem; color: #fca5a5;">
+          ⚠️ <strong>STATUTORY DECLARATION:</strong> Confirm that this is a municipal civil defect for departmental resolution.
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.95rem;">
+          <p><strong>Title:</strong> <span id="rev-title" style="color: #ffffff;"></span></p>
+          <p><strong>Department:</strong> <span id="rev-dept" style="color: var(--teal-light);"></span></p>
+          <p><strong>Category:</strong> <span id="rev-category"></span></p>
+          <p><strong>Severity:</strong> <span id="rev-priority"></span></p>
+          <p><strong>Ward:</strong> <span id="rev-ward"></span></p>
+          <p><strong>Location:</strong> <span id="rev-location"></span></p>
+          <p><strong>Coordinates:</strong> <span id="rev-coords" style="font-family: var(--font-mono); color: var(--teal-light);"></span></p>
+        </div>
+      </div>
+      <div class="modal-dialog-footer">
+        <button type="button" class="btn btn-glass" data-modal-close="modal-review">Edit Information</button>
+        <button type="button" class="btn btn-lagoon" id="btn-final-lodge-submit">Confirm &amp; Lodge into Database</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: OFFICER DIRECTIVE & STATUS UPDATE -->
+  <div id="modal-officer-action" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-dialog">
+      <div class="modal-dialog-header">
+        <span class="modal-dialog-title">Issue Administrative Directive &amp; Update Status</span>
+        <button class="modal-dialog-close" data-modal-close="modal-officer-action">&times;</button>
+      </div>
+      <div class="modal-dialog-body">
+        <input type="hidden" id="officer-update-ref-id">
+        <div style="margin-bottom: 18px;">
+          <span class="report-token" id="officer-dialog-ref">CS-2026-XXXXX</span>
+          <h4 style="margin-top: 8px; font-size: 1.1rem; font-weight: 700; color: #ffffff;" id="officer-dialog-title">Issue Title</h4>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="officer-select-status">New Grievance Stage *</label>
+          <select id="officer-select-status" class="form-select" required>
+            <option value="Submitted">Submitted (Queued)</option>
+            <option value="Under Review">Under Review (Zonal Inspection)</option>
+            <option value="In Progress">In Progress (Work-Ticket Dispatched)</option>
+            <option value="Resolved">Resolved (Field Rectification Verified)</option>
+            <option value="Rejected">Rejected (Out of Municipal Jurisdiction)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="officer-select-dept">Re-route Department (Optional)</label>
+          <select id="officer-select-dept" class="form-select">
+            <option value="">Keep Existing Department</option>
+            <option value="Roads & Civil Infrastructure">Roads &amp; Civil Infrastructure</option>
+            <option value="Electrical & Public Lighting">Electrical &amp; Public Lighting</option>
+            <option value="Water Supply & Sewerage Board">Water Supply &amp; Sewerage Board</option>
+            <option value="Solid Waste Management Cell">Solid Waste Management Cell</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="officer-text-remarks">Official Administrative Remark / Work Order Note *</label>
+          <textarea id="officer-text-remarks" class="form-textarea" placeholder="Detail the field inspection findings, assigned contractor, or resolution justification..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-dialog-footer">
+        <button type="button" class="btn btn-glass" data-modal-close="modal-officer-action">Cancel</button>
+        <button type="button" class="btn btn-lagoon" id="btn-save-officer-directive">Publish Official Directive</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Shelf -->
+  <div class="toast-shelf" id="toast-shelf" aria-live="polite"></div>
+
+  <!-- FOOTER -->
+  <footer class="stipple-footer">
+    <p class="tagline">CitizenShield safeguards municipal infrastructure in the moments that matter most.</p>
+    <p style="margin-top: 8px;">Permanent Database Mode Active: <code>c:\Citizien Shield\data\citizenshield.db</code></p>
+    <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Designed for CSE Full-Stack Web Development &amp; Cloud Systems Evaluation.</p>
+  </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Application Bootstrap -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

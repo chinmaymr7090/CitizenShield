@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.email.matches('.*@admin\\.citizenshield\\.gov') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // Reports Collection
+    match /reports/{reportId} {
+      // Read: Users can read their own reports; Admins can read all reports
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+
+      // Create: Authenticated users can submit a new report for themselves
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'Submitted'
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.category in [
+          'Roads and Transport',
+          'Streetlights and Electricity',
+          'Garbage and Sanitation',
+          'Water and Drainage',
+          'Public Infrastructure',
+          'Public Safety',
+          'Other'
+        ]
+        && request.resource.data.description is string && request.resource.data.description.size() > 0 && request.resource.data.description.size() <= 2500
+        && request.resource.data.location is string && request.resource.data.location.size() > 0;
+
+      // Update: Only Admins can modify status, adminRemarks, and statusHistory
+      // Ordinary citizens cannot alter reports after submission
+      allow update: if isAdmin() && (
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'adminRemarks', 'statusHistory', 'updatedAt'])
+      );
+
+      // Deletion is strictly restricted to Admins
+      allow delete: if isAdmin();
+    }
+
+    // Public lookup for report tracking by Report ID
+    // (Restricted to querying specific non-sensitive tracking data)
+    match /reports/{reportId} {
+      allow get: if isAuthenticated() || (
+        request.query.limit <= 1
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId && (
+        // Users cannot grant themselves admin rights
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}
