@@ -163,11 +163,22 @@ function updateAuthUI(user) {
  * Navigation & View Router
  */
 function setupNavigation() {
+  // Mobile Navigation Hamburger Toggle
+  const btnMobileMenu = document.getElementById('btn-mobile-menu');
+  const mainNav = document.getElementById('main-navigation');
+  if (btnMobileMenu && mainNav) {
+    btnMobileMenu.addEventListener('click', () => {
+      mainNav.classList.toggle('mobile-open');
+    });
+  }
+
   document.querySelectorAll('[data-view-target]').forEach(el => {
     el.addEventListener('click', (e) => {
       e.preventDefault();
       const target = el.getAttribute('data-view-target');
       navigate(target);
+      // Close mobile menu upon selection
+      if (mainNav) mainNav.classList.remove('mobile-open');
     });
   });
 
@@ -432,26 +443,48 @@ function setupLodgeGrievance() {
     wardSelect.value = "Ward 112 - Domlur / Indiranagar (Central Division)";
   }
 
-  // 2. Live Camera Access
+  // 2. Live Camera Access (with Automatic Fallback for Mobile Camera Hardware)
   if (btnOpenCam) {
     btnOpenCam.addEventListener('click', async () => {
+      // If WebRTC getUserMedia is blocked on plain HTTP on mobile, trigger native camera shutter directly
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showToast("Live Camera API not supported on this browser. Use 'Choose File' button.", "warning");
+        showToast("Opening native mobile camera shutter...", "info");
+        fileInput.click();
         return;
       }
       try {
         camContainer.classList.remove('hidden');
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-          audio: false
-        });
+        
+        // Try back / environmental camera with video constraints
+        const constraints = [
+          { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }, audio: false },
+          { video: { facingMode: 'user' }, audio: false },
+          { video: true, audio: false }
+        ];
+
+        let streamObtained = null;
+        for (const c of constraints) {
+          try {
+            streamObtained = await navigator.mediaDevices.getUserMedia(c);
+            if (streamObtained) break;
+          } catch (e) {
+            console.debug("Constraint trial fallback:", e);
+          }
+        }
+
+        if (!streamObtained) {
+          throw new Error("Unable to access camera sensor on this connection");
+        }
+
+        mediaStream = streamObtained;
         videoElem.srcObject = mediaStream;
         await videoElem.play();
-        showToast("Live Camera Feed Active! Align civic hazard and click Capture.", "info");
+        showToast("Live Camera Active! Frame the defect and tap Capture Snapshot.", "info");
       } catch (err) {
-        console.error("Camera access error:", err);
-        showToast(`Camera permission error: ${err.message}. Please allow camera access or upload photo.`, "error");
+        console.warn("Direct video viewfinder unavailable, switching to mobile native shutter:", err);
         camContainer.classList.add('hidden');
+        showToast("Opening device camera app...", "info");
+        fileInput.click();
       }
     });
   }
@@ -517,52 +550,84 @@ function setupLodgeGrievance() {
     });
   }
 
-  // GPS Detection with Reverse Geocoding
+  // GPS Detection with Multi-Tier Fallback for Mobile Phones
   btnDetectGps.addEventListener('click', () => {
+    btnDetectGps.disabled = true;
+    btnDetectGps.textContent = "Detecting GPS...";
+
+    const handleSuccess = async (latitude, longitude, sourceLabel = "GPS Sensor") => {
+      currentReportLat = latitude;
+      currentReportLng = longitude;
+
+      document.getElementById('report-lat').value = latitude.toFixed(6);
+      document.getElementById('report-lng').value = longitude.toFixed(6);
+      document.getElementById('coords-readout').textContent = 
+        `${sourceLabel} Acquired: Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)}`;
+
+      setReportMapPin(latitude, longitude, 17);
+
+      // Reverse geocoding via local server proxy (never blocked by mobile browser CORS)
+      try {
+        const res = await fetch(`/api/reverse-geocode?lat=${latitude}&lon=${longitude}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.display_name) {
+            inputLoc.value = data.display_name;
+          }
+        }
+      } catch (e) {
+        console.debug("Geocode proxy error:", e);
+      }
+
+      btnDetectGps.disabled = false;
+      btnDetectGps.textContent = "📍 Detect GPS";
+      showToast(`${sourceLabel} acquired successfully! Pin dropped on map.`, "success");
+    };
+
+    // Fallback: If device GPS fails or permission denied, fetch IP location
+    const fallbackToIp = async (reason) => {
+      try {
+        btnDetectGps.textContent = "Finding Area...";
+        const res = await fetch('/api/ip-location');
+        if (res.ok) {
+          const data = await res.json();
+          handleSuccess(data.latitude, data.longitude, "Network Location");
+          showToast(`Device GPS prompt unavailable (${reason}). Located via city network. Tap map to fine-tune exact street.`, "info", 6000);
+          return;
+        }
+      } catch (e) {
+        console.warn("IP location fallback failed:", e);
+      }
+      btnDetectGps.disabled = false;
+      btnDetectGps.textContent = "📍 Detect GPS";
+      showToast("Unable to detect automatic location. Tap directly on the map to place your pin.", "warning", 6000);
+    };
+
     if (!navigator.geolocation) {
-      showToast("Geolocation is not supported by your browser.", "warning");
+      fallbackToIp("Browser unsupported");
       return;
     }
 
-    btnDetectGps.disabled = true;
-    btnDetectGps.textContent = "Detecting...";
-
+    // Attempt 1: High Accuracy with reasonable timeout
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const { latitude, longitude } = pos.coords;
-        currentReportLat = latitude;
-        currentReportLng = longitude;
-
-        document.getElementById('report-lat').value = latitude.toFixed(6);
-        document.getElementById('report-lng').value = longitude.toFixed(6);
-        document.getElementById('coords-readout').textContent = 
-          `GPS Acquired: Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)}`;
-
-        setReportMapPin(latitude, longitude, 17);
-
-        // Reverse geocoding via OpenStreetMap
-        try {
-          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.display_name) {
-              inputLoc.value = data.display_name;
-            }
-          }
-        } catch (e) {
-          console.debug("OSM geocode error:", e);
-        }
-
-        btnDetectGps.disabled = false;
-        btnDetectGps.textContent = "📍 Detect GPS";
-        showToast("GPS coordinates acquired with user consent.", "success");
+      (pos) => {
+        handleSuccess(pos.coords.latitude, pos.coords.longitude, "Satellite GPS");
       },
-      (err) => {
-        btnDetectGps.disabled = false;
-        btnDetectGps.textContent = "📍 Detect GPS";
-        showToast(`Location error: ${err.message}. Please enter address manually.`, "warning");
+      (err1) => {
+        console.warn("High accuracy GPS failed, trying standard cellular/wifi position:", err1.message);
+        // Attempt 2: Standard Accuracy (works instantly on mobile cellular & wifi)
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            handleSuccess(pos.coords.latitude, pos.coords.longitude, "Cellular/Wi-Fi GPS");
+          },
+          (err2) => {
+            console.warn("Standard geolocation failed:", err2.message);
+            fallbackToIp(err2.message);
+          },
+          { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 }
+        );
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 7000, maximumAge: 30000 }
     );
   });
 
