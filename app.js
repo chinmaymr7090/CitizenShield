@@ -23,6 +23,7 @@ import {
 } from './js/map.js';
 
 import { StippleOrb } from './js/orb.js';
+import { KARNATAKA_MUNICIPAL_ZONES } from './js/karnataka-wards.js';
 
 // Global State
 let activeUser = null;
@@ -360,6 +361,121 @@ function setupLodgeGrievance() {
   const fileInput = document.getElementById('lodge-image');
   const previewBox = document.getElementById('lodge-img-preview-box');
   const previewImg = document.getElementById('lodge-img-preview');
+  const wardSelect = document.getElementById('lodge-ward');
+
+  // Live Camera Controls
+  const btnOpenCam = document.getElementById('btn-open-live-cam');
+  const btnCloseCam = document.getElementById('btn-close-live-cam');
+  const btnSnap = document.getElementById('btn-snap-photo');
+  const camContainer = document.getElementById('live-cam-container');
+  const videoElem = document.getElementById('live-cam-video');
+  const canvasElem = document.getElementById('live-cam-canvas');
+  const btnRemovePhoto = document.getElementById('btn-remove-photo');
+  let mediaStream = null;
+
+  // 1. Populate all 385+ Karnataka Municipal Wards
+  if (wardSelect) {
+    wardSelect.innerHTML = '<option value="">-- Select Municipality &amp; Ward --</option>';
+    KARNATAKA_MUNICIPAL_ZONES.forEach(zone => {
+      const optGroup = document.createElement('optgroup');
+      optGroup.label = zone.corporation;
+      zone.wards.forEach(w => {
+        const opt = document.createElement('option');
+        opt.value = w;
+        opt.textContent = w;
+        optGroup.appendChild(opt);
+      });
+      wardSelect.appendChild(optGroup);
+    });
+
+    // Default select Bengaluru Central Ward 112
+    wardSelect.value = "BBMP Ward 112 - Domlur / Indiranagar (Central)";
+  }
+
+  // 2. Live Camera Access
+  if (btnOpenCam) {
+    btnOpenCam.addEventListener('click', async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast("Live Camera API not supported on this browser. Use 'Choose File' button.", "warning");
+        return;
+      }
+      try {
+        camContainer.classList.remove('hidden');
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false
+        });
+        videoElem.srcObject = mediaStream;
+        await videoElem.play();
+        showToast("Live Camera Feed Active! Align civic hazard and click Capture.", "info");
+      } catch (err) {
+        console.error("Camera access error:", err);
+        showToast(`Camera permission error: ${err.message}. Please allow camera access or upload photo.`, "error");
+        camContainer.classList.add('hidden');
+      }
+    });
+  }
+
+  const stopCamera = () => {
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+    if (videoElem) {
+      videoElem.srcObject = null;
+    }
+    if (camContainer) {
+      camContainer.classList.add('hidden');
+    }
+  };
+
+  if (btnCloseCam) {
+    btnCloseCam.addEventListener('click', () => {
+      stopCamera();
+    });
+  }
+
+  if (btnSnap) {
+    btnSnap.addEventListener('click', () => {
+      if (!videoElem || !videoElem.videoWidth) {
+        showToast("Waiting for live camera frame...", "warning");
+        return;
+      }
+      const width = videoElem.videoWidth;
+      const height = videoElem.videoHeight;
+      canvasElem.width = width;
+      canvasElem.height = height;
+      const ctx = canvasElem.getContext('2d');
+      ctx.drawImage(videoElem, 0, 0, width, height);
+
+      // Convert snapshot to Blob file
+      canvasElem.toBlob((blob) => {
+        if (!blob) {
+          showToast("Failed to capture image snapshot.", "error");
+          return;
+        }
+        const fileName = `live_cam_${Date.now()}.jpg`;
+        selectedEvidenceFile = new File([blob], fileName, { type: 'image/jpeg' });
+
+        // Update preview
+        previewImg.src = canvasElem.toDataURL('image/jpeg');
+        document.getElementById('preview-file-name').textContent = `Live Camera Photo (${fileName})`;
+        previewBox.classList.remove('hidden');
+
+        stopCamera();
+        showToast("Live snapshot captured and attached to grievance!", "success");
+      }, 'image/jpeg', 0.92);
+    });
+  }
+
+  if (btnRemovePhoto) {
+    btnRemovePhoto.addEventListener('click', () => {
+      selectedEvidenceFile = null;
+      fileInput.value = '';
+      previewBox.classList.add('hidden');
+      showToast("Evidence photo removed.", "info");
+    });
+  }
 
   // GPS Detection with Reverse Geocoding
   btnDetectGps.addEventListener('click', () => {
