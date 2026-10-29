@@ -1,7 +1,7 @@
 // CitizenShield - Backend API Client & Session Vault
 
-const API_BASE = window.location.origin.includes(":5000") 
-  ? "" 
+const API_BASE = window.location.origin.includes(":5000")
+  ? ""
   : "http://127.0.0.1:5000";
 
 let cachedUser = null;
@@ -40,13 +40,12 @@ export function setCurrentUser(user) {
 
 async function request(endpoint, options = {}) {
   const token = getToken();
-  const headers = options.headers || {};
+  const headers = options.headers ? { ...options.headers } : {};
 
   if (token && !headers["Authorization"]) {
-    headers["Authorization"] = `Bearer ${token}`;
+    headers["Authorization"] = "Bearer " + token;
   }
 
-  // Do not set Content-Type for FormData (browser sets boundary)
   if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }

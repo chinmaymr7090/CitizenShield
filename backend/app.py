@@ -41,7 +41,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_current_user():
-    """Extracts and verifies Bearer token from request."""
+    """Extracts and verifies the bearer token from the request."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
@@ -491,51 +491,6 @@ def get_metrics(user):
         "byCategory": by_category,
         "byPriority": by_priority
     })
-
-# Reverse Geocoding Proxy to bypass mobile browser CORS & HTTP mixed-content blocks
-@app.route("/api/reverse-geocode")
-def reverse_geocode():
-    lat = request.args.get("lat")
-    lon = request.args.get("lon")
-    if not lat or not lon:
-        return jsonify({"error": "Latitude and longitude required"}), 400
-    try:
-        import urllib.request
-        import json
-        url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lon}"
-        req = urllib.request.Request(url, headers={"User-Agent": "CitizenShield-MunicipalPortal/1.0"})
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return jsonify({
-                "display_name": data.get("display_name", ""),
-                "address": data.get("address", {})
-            })
-    except Exception as e:
-        return jsonify({"error": str(e), "display_name": f"Lat {lat}, Lng {lon}"}), 200
-
-# IP-based Geolocation Fallback when device GPS is disabled or blocked
-@app.route("/api/ip-location")
-def ip_location():
-    try:
-        import urllib.request
-        import json
-        req = urllib.request.Request("https://ipapi.co/json/", headers={"User-Agent": "CitizenShield-MunicipalPortal/1.0"})
-        with urllib.request.urlopen(req, timeout=4) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return jsonify({
-                "latitude": data.get("latitude", 12.9716),
-                "longitude": data.get("longitude", 77.5946),
-                "city": data.get("city", "Bengaluru"),
-                "region": data.get("region", "Karnataka")
-            })
-    except Exception:
-        # Fallback to central Bengaluru default
-        return jsonify({
-            "latitude": 12.9716,
-            "longitude": 77.5946,
-            "city": "Bengaluru",
-            "region": "Karnataka"
-        })
 
 # Serve uploaded evidence images safely
 @app.route("/api/uploads/<path:filename>")

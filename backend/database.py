@@ -38,6 +38,31 @@ def verify_password(password, salt, stored_hash):
     pwd_hash, _ = hash_password(password, salt)
     return pwd_hash == stored_hash
 
+
+def repair_default_credentials(cursor):
+    """Ensures the bundled demo accounts remain valid across stale database copies."""
+    default_credentials = {
+        "admin@citizenshield.gov": "Admin@2026",
+        "engineer@citizenshield.gov": "Engineer@2026",
+        "rahul.citizen@gmail.com": "Citizen@2026",
+    }
+
+    for email, password in default_credentials.items():
+        row = cursor.execute(
+            "SELECT id, password_hash, password_salt FROM users WHERE email = ?",
+            (email,),
+        ).fetchone()
+        if not row:
+            continue
+
+        expected_hash, expected_salt = hash_password(password)
+        if row[1] != expected_hash or row[2] != expected_salt:
+            cursor.execute(
+                "UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?",
+                (expected_hash, expected_salt, row[0]),
+            )
+
+
 def init_db():
     """Initializes tables and seeds permanent default administrative and citizen data."""
     conn = get_connection()
@@ -124,7 +149,7 @@ def init_db():
     );
     """)
 
-    # Seed Default Accounts if empty
+    # Seed Default Accounts if empty, and repair stale bundled credentials on older DB snapshots.
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
         print("[CitizenShield DB] Seeding default municipal administrative and citizen accounts...")
@@ -277,6 +302,7 @@ def init_db():
                     VALUES (?, 'Resolved', 'Field rectification completed. Photo verification verified.', 'Municipal Inspectorate', 'Directorate', ?)
                 """, (rep_id, rep[18]))
 
+    repair_default_credentials(cursor)
     conn.commit()
     conn.close()
     print(f"[CitizenShield DB] Database initialized. Permanent storage active at: {DB_PATH}")
