@@ -5,11 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CitizenShield — Smart Municipal Grievance Redressal & Safety Directorate</title>
 
+  <!-- Progressive Web App (PWA) Manifest & Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#10b981">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CitizenShield">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
   <!-- Leaflet CSS for Municipal GIS Map -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
   <link rel="stylesheet" href="style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310b981'><circle cx='12' cy='12' r='10'/></svg>">
+  <link rel="icon" href="/icons/icon-192.png">
 </head>
 <body>
 
@@ -49,6 +58,10 @@
       </nav>
 
       <div class="nav-actions">
+        <!-- PWA Install App Button -->
+        <button class="btn btn-glass btn-sm hidden" id="btn-pwa-install" style="border-color: var(--mint-glow); color: var(--mint-glow); padding: 5px 12px;">
+          📲 Install App
+        </button>
         <div id="user-profile-badge" class="user-session-pill hidden">
           <span id="header-user-name" style="font-weight: 700; color: #ffffff;">Citizen</span>
           <span class="role-tag" id="header-user-role">Citizen</span>
@@ -356,12 +369,12 @@
                 </select>
               </div>
 
-              <!-- Ward (Populated with all 385+ Karnataka Municipal Wards) -->
+              <!-- Ward (Populated exclusively with all 198 Bengaluru BBMP Wards) -->
               <div class="form-group">
-                <label class="form-label" for="lodge-ward">Administrative Ward (Karnataka Municipalities) *</label>
+                <label class="form-label" for="lodge-ward">Administrative Ward (Bengaluru BBMP 198 Wards) *</label>
                 <select id="lodge-ward" class="form-select" required>
-                  <option value="">-- Select Municipality &amp; Ward --</option>
-                  <!-- Dynamically populated from Karnataka Wards Directory -->
+                  <option value="">-- Select Bengaluru BBMP Ward (1 to 198) --</option>
+                  <!-- Dynamically populated with all 198 BBMP wards -->
                 </select>
               </div>
 

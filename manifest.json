@@ -1,0 +1,41 @@
+{
+  "name": "CitizenShield - Smart Citizen Safety & Municipal Redressal Directorate",
+  "short_name": "CitizenShield",
+  "description": "Smart Bengaluru Civic Grievance Redressal and Spatial Hazard Radar Portal",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#03080c",
+  "theme_color": "#10b981",
+  "categories": ["utilities", "government", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Lodge Grievance",
+      "short_name": "Report",
+      "description": "Pin a civic hazard with live photo and GPS",
+      "url": "/#lodge",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Track Case",
+      "short_name": "Track",
+      "description": "Track existing complaint status",
+      "url": "/#track",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -23,7 +23,7 @@ import {
 } from './js/map.js';
 
 import { StippleOrb } from './js/orb.js';
-import { KARNATAKA_MUNICIPAL_ZONES } from './js/karnataka-wards.js';
+import { BENGALURU_BBMP_WARDS } from './js/bengaluru-wards.js';
 
 // Global State
 let activeUser = null;
@@ -65,6 +65,51 @@ async function initApp() {
 
   // 8. Load initial Home radar & statistics
   loadHomeOverview();
+
+  // 9. Register Progressive Web App (PWA) & Install Prompt
+  setupPwaApp();
+}
+
+/**
+ * PWA Service Worker Registration & One-Click App Install Prompt
+ */
+function setupPwaApp() {
+  // Register Service Worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('[PWA] Service Worker registered:', reg.scope))
+        .catch((err) => console.debug('[PWA] Service Worker registration skipped:', err));
+    });
+  }
+
+  // Handle native "Install App" prompt on Chrome, Edge, Android, iOS
+  let deferredPrompt = null;
+  const btnInstall = document.getElementById('btn-pwa-install');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (btnInstall) {
+      btnInstall.classList.remove('hidden');
+    }
+  });
+
+  if (btnInstall) {
+    btnInstall.addEventListener('click', async () => {
+      if (!deferredPrompt) {
+        showToast("To install as an app on your phone: Tap browser menu (⋮ or Share) ➔ 'Add to Home Screen' / 'Install App'", "info", 8000);
+        return;
+      }
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        showToast("CitizenShield installed successfully on your device!", "success");
+      }
+      deferredPrompt = null;
+      btnInstall.classList.add('hidden');
+    });
+  }
 }
 
 /**
@@ -373,23 +418,18 @@ function setupLodgeGrievance() {
   const btnRemovePhoto = document.getElementById('btn-remove-photo');
   let mediaStream = null;
 
-  // 1. Populate all 385+ Karnataka Municipal Wards
+  // 1. Populate all 198 Bengaluru BBMP Wards exclusively
   if (wardSelect) {
-    wardSelect.innerHTML = '<option value="">-- Select Municipality &amp; Ward --</option>';
-    KARNATAKA_MUNICIPAL_ZONES.forEach(zone => {
-      const optGroup = document.createElement('optgroup');
-      optGroup.label = zone.corporation;
-      zone.wards.forEach(w => {
-        const opt = document.createElement('option');
-        opt.value = w;
-        opt.textContent = w;
-        optGroup.appendChild(opt);
-      });
-      wardSelect.appendChild(optGroup);
+    wardSelect.innerHTML = '<option value="">-- Select Bengaluru BBMP Ward (1 to 198) --</option>';
+    BENGALURU_BBMP_WARDS.forEach(wardName => {
+      const opt = document.createElement('option');
+      opt.value = wardName;
+      opt.textContent = wardName;
+      wardSelect.appendChild(opt);
     });
 
-    // Default select Bengaluru Central Ward 112
-    wardSelect.value = "BBMP Ward 112 - Domlur / Indiranagar (Central)";
+    // Default select Ward 112 (Domlur / Indiranagar Central)
+    wardSelect.value = "Ward 112 - Domlur / Indiranagar (Central Division)";
   }
 
   // 2. Live Camera Access
