@@ -99,7 +99,7 @@ def init_db():
         priority TEXT NOT NULL DEFAULT 'Normal',
         description TEXT NOT NULL,
         location TEXT NOT NULL,
-        ward TEXT DEFAULT 'Ward 112 - Central Division',
+        ward TEXT DEFAULT 'Ward 11 - Mandipet / Town Hall Division',
         latitude REAL,
         longitude REAL,
         image_filename TEXT,

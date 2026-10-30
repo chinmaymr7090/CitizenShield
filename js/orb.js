@@ -77,7 +77,8 @@ const CONTINENT_POLYGONS = [
 
 // Key Municipal City Beacons
 const GLOBAL_BEACONS = [
-  { name: "Bengaluru (Ward 112)", lat: 12.9716, lng: 77.5946, primary: true, code: "BLR" },
+  { name: "Tumakuru (35 Wards)", lat: 13.3414, lng: 77.1022, primary: true, code: "TUM" },
+  { name: "Bengaluru", lat: 12.9716, lng: 77.5946, primary: false, code: "BLR" },
   { name: "New Delhi", lat: 28.6139, lng: 77.2090, primary: false, code: "DEL" },
   { name: "London", lat: 51.5074, lng: -0.1278, primary: false, code: "LDN" },
   { name: "New York", lat: 40.7128, lng: -74.0060, primary: false, code: "NYC" },
@@ -269,9 +270,9 @@ export class StippleOrb {
   initArcs() {
     // 3D Telemetry Links between Major Municipal Hubs
     this.arcs = [
-      { from: "London", to: "Bengaluru (Ward 112)", progress: 0.15, speed: 0.007 },
+      { from: "London", to: "Tumakuru (35 Wards)", progress: 0.15, speed: 0.007 },
       { from: "New York", to: "London", progress: 0.60, speed: 0.006 },
-      { from: "Tokyo", to: "Bengaluru (Ward 112)", progress: 0.35, speed: 0.008 }
+      { from: "Tokyo", to: "Tumakuru (35 Wards)", progress: 0.35, speed: 0.008 }
     ];
   }
 
@@ -345,8 +346,8 @@ export class StippleOrb {
     }
   }
 
-  focusWard(lat = 12.9716, lon = 77.5946) {
-    // Smoothly interpolate rotation to face Bengaluru
+  focusWard(lat = 13.3414, lon = 77.1022) {
+    // Smoothly interpolate rotation to face Tumakuru City Corporation
     const radLon = lon * (Math.PI / 180);
     const radLat = lat * (Math.PI / 180);
     this.targetRotationY = -radLon;
@@ -599,7 +600,7 @@ export class StippleOrb {
         if (b.primary) {
           this.ctx.font = '600 9px monospace';
           this.ctx.fillStyle = '#2dd4bf';
-          this.ctx.fillText("● BENGALURU WARD 112", proj.x + 8, proj.y + 7);
+          this.ctx.fillText("● TUMAKURU MAHANAGARA PALIKE", proj.x + 8, proj.y + 7);
         }
       }
     }

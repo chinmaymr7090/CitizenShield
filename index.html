@@ -72,12 +72,12 @@
         <div class="hero-copy">
           <div class="social-pill">
             <span class="social-dot"></span>
-            <span>Joined by 14,200+ active citizens across 198 wards</span>
+            <span>Joined by 14,200+ active citizens across all 35 Tumakuru Corporation wards</span>
           </div>
 
-          <h1><em>Protect the City,</em><br>Share the Shield</h1>
+          <h1><em>Protect Tumakuru,</em><br>Share the Shield</h1>
 
-          <p>Back your neighborhood before the damage escalates. Report craters, grid blackouts, sewage bursts, and public hazards with verified GPS coordinates and an immutable SQLite audit trail.</p>
+          <p>Back your neighborhood before the damage escalates. Report craters, grid blackouts, sewage bursts, and public hazards across all 35 Tumakuru City Corporation wards with verified GPS coordinates and an immutable SQLite audit trail.</p>
 
           <div class="hero-buttons">
             <button class="btn btn-lagoon btn-lg" data-view-target="view-submit">Lodge a Grievance Now →</button>
@@ -86,9 +86,9 @@
 
           <div class="hero-backers">
             <span>Verified Directorate Partners:</span>
-            <div class="backer-badge"><span class="backer-mark">🛡️</span> BBMP Municipal</div>
-            <div class="backer-badge"><span class="backer-mark">⚡</span> BESCOM Power</div>
-            <div class="backer-badge"><span class="backer-mark">💧</span> BWSSB Water</div>
+            <div class="backer-badge"><span class="backer-mark">🛡️</span> Tumakuru Mahanagara Palike</div>
+            <div class="backer-badge"><span class="backer-mark">⚡</span> BESCOM Tumkur</div>
+            <div class="backer-badge"><span class="backer-mark">💧</span> KUWSDB Water Board</div>
           </div>
         </div>
 
@@ -108,8 +108,8 @@
             </div>
             <div class="pod-telemetry-readout">
               <span class="telemetry-pin">📍</span>
-              <span id="pod-live-coords">12.9716° N, 77.5946° E</span>
-              <span class="ward-tag">WARD 112</span>
+              <span id="pod-live-coords">13.3414° N, 77.1022° E</span>
+              <span class="ward-tag">TUMAKURU</span>
             </div>
           </div>
 
@@ -126,7 +126,7 @@
               <span>Click &amp; drag to rotate Earth</span>
             </div>
             <div class="pod-actions">
-              <button type="button" class="pod-ctrl-btn" id="btn-focus-ward" title="Center on Ward 112 / India">Target Ward 112</button>
+              <button type="button" class="pod-ctrl-btn" id="btn-focus-ward" title="Center on Tumakuru City / India">Target Tumakuru</button>
               <button type="button" class="pod-ctrl-btn" id="btn-toggle-spin" title="Pause or Resume Auto-Rotation">Spin: On</button>
             </div>
           </div>
@@ -358,13 +358,44 @@
 
               <!-- Ward -->
               <div class="form-group">
-                <label class="form-label" for="lodge-ward">Administrative Ward *</label>
+                <label class="form-label" for="lodge-ward">Administrative Ward (Tumakuru City Corporation) *</label>
                 <select id="lodge-ward" class="form-select" required>
-                  <option value="Ward 112 - Central Division">Ward 112 - Central Division</option>
-                  <option value="Ward 109 - Commercial Division">Ward 109 - Commercial Division</option>
-                  <option value="Ward 93 - Vasanth Nagar Division">Ward 93 - Vasanth Nagar Division</option>
-                  <option value="Ward 142 - Indiranagar Division">Ward 142 - Indiranagar Division</option>
-                  <option value="Ward 174 - Koramangala Division">Ward 174 - Koramangala Division</option>
+                  <option value="" disabled selected>-- Select Tumakuru Corporation Ward --</option>
+                  <option value="Ward 1 - Antharasanahalli / Sira Road North">Ward 1 - Antharasanahalli / Sira Road North</option>
+                  <option value="Ward 2 - Maralenahalli / Sira Gate Outer">Ward 2 - Maralenahalli / Sira Gate Outer</option>
+                  <option value="Ward 3 - Belagumba / Puttashamayyanapalya">Ward 3 - Belagumba / Puttashamayyanapalya</option>
+                  <option value="Ward 4 - Dibbur / Shani Mahatma Temple Road">Ward 4 - Dibbur / Shani Mahatma Temple Road</option>
+                  <option value="Ward 5 - Bheemasandra / Kuvempu Nagar">Ward 5 - Bheemasandra / Kuvempu Nagar</option>
+                  <option value="Ward 6 - Heggere / Ring Road West">Ward 6 - Heggere / Ring Road West</option>
+                  <option value="Ward 7 - Melekote / Sadashivanagar Extension">Ward 7 - Melekote / Sadashivanagar Extension</option>
+                  <option value="Ward 8 - Batawadi (North) / Bengaluru Highway">Ward 8 - Batawadi (North) / Bengaluru Highway</option>
+                  <option value="Ward 9 - Batawadi (South) / Mahalakshminagar">Ward 9 - Batawadi (South) / Mahalakshminagar</option>
+                  <option value="Ward 10 - Kyatsandra / Siddaganga Math Gateway">Ward 10 - Kyatsandra / Siddaganga Math Gateway</option>
+                  <option value="Ward 11 - Mandipet / Town Hall Commercial Core">Ward 11 - Mandipet / Town Hall Commercial Core</option>
+                  <option value="Ward 12 - Chickpet / Old Market Road">Ward 12 - Chickpet / Old Market Road</option>
+                  <option value="Ward 13 - Ashok Nagar / MG Road Corridor">Ward 13 - Ashok Nagar / MG Road Corridor</option>
+                  <option value="Ward 14 - Gandhi Nagar / CSI Layout">Ward 14 - Gandhi Nagar / CSI Layout</option>
+                  <option value="Ward 15 - Vinayaka Nagar / Barline Road">Ward 15 - Vinayaka Nagar / Barline Road</option>
+                  <option value="Ward 16 - Jayanagar (East) / Someshwara Extension">Ward 16 - Jayanagar (East) / Someshwara Extension</option>
+                  <option value="Ward 17 - Jayanagar (West) / TUDA Layout">Ward 17 - Jayanagar (West) / TUDA Layout</option>
+                  <option value="Ward 18 - SIT College Campus / SIT Extension">Ward 18 - SIT College Campus / SIT Extension</option>
+                  <option value="Ward 19 - Vidyanagar / Siddaganga Extension">Ward 19 - Vidyanagar / Siddaganga Extension</option>
+                  <option value="Ward 20 - SS Puram (Main) / 1st-5th Cross">Ward 20 - SS Puram (Main) / 1st-5th Cross</option>
+                  <option value="Ward 21 - SS Puram (South) / Basaveshwara Road">Ward 21 - SS Puram (South) / Basaveshwara Road</option>
+                  <option value="Ward 22 - Upparhalli / Maruthi Nagar">Ward 22 - Upparhalli / Maruthi Nagar</option>
+                  <option value="Ward 23 - Gubbi Gate Market / Railway Station Corridor">Ward 23 - Gubbi Gate Market / Railway Station Corridor</option>
+                  <option value="Ward 24 - Shanthinagar / Bheemanagar">Ward 24 - Shanthinagar / Bheemanagar</option>
+                  <option value="Ward 25 - Hanumanthapura / Gangothri Nagar">Ward 25 - Hanumanthapura / Gangothri Nagar</option>
+                  <option value="Ward 26 - Amanikere Lake Promenade / Garden Road">Ward 26 - Amanikere Lake Promenade / Garden Road</option>
+                  <option value="Ward 27 - Sridevi Nagar / Lingapura Corridor">Ward 27 - Sridevi Nagar / Lingapura Corridor</option>
+                  <option value="Ward 28 - Saraswathipuram / University Road">Ward 28 - Saraswathipuram / University Road</option>
+                  <option value="Ward 29 - Gokula Extension / Channabasaveshwara Nagar">Ward 29 - Gokula Extension / Channabasaveshwara Nagar</option>
+                  <option value="Ward 30 - Sathyamangala / Industrial Bypass">Ward 30 - Sathyamangala / Industrial Bypass</option>
+                  <option value="Ward 31 - Shettihalli / Bypass Ring Road">Ward 31 - Shettihalli / Bypass Ring Road</option>
+                  <option value="Ward 32 - Devarayapatna / Kunigal Road">Ward 32 - Devarayapatna / Kunigal Road</option>
+                  <option value="Ward 33 - Kothitopu / Gollarahatti">Ward 33 - Kothitopu / Gollarahatti</option>
+                  <option value="Ward 34 - Manjunathaswamy Layout / Gulur Cross">Ward 34 - Manjunathaswamy Layout / Gulur Cross</option>
+                  <option value="Ward 35 - Obalapura / Ring Road South Junction">Ward 35 - Obalapura / Ring Road South Junction</option>
                 </select>
               </div>
 
@@ -393,7 +424,7 @@
                 <label class="form-label">Interactive GIS Pinpoint (Click map to position marker)</label>
                 <div class="gis-map-frame gis-map-sm" id="report-gis-map"></div>
                 <div id="coords-readout" style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--teal-light); margin-top: 6px;">
-                  Coordinates: Lat 12.971600, Lng 77.594600 (Central Municipal Datum)
+                  Coordinates: Lat 13.341400, Lng 77.102200 (Tumakuru City Corporation Datum)
                 </div>
               </div>
 
@@ -650,6 +681,45 @@
               <option value="Garbage and Sanitation">Garbage and Sanitation</option>
               <option value="Public Infrastructure">Public Infrastructure</option>
               <option value="Public Safety">Public Safety</option>
+            </select>
+
+            <select id="adm-filter-ward" class="form-select" style="width: auto; padding: 8px 12px; font-size: 0.85rem;">
+              <option value="ALL">All 35 Tumakuru Wards</option>
+              <option value="Ward 1">Ward 1 - Antharasanahalli</option>
+              <option value="Ward 2">Ward 2 - Maralenahalli</option>
+              <option value="Ward 3">Ward 3 - Belagumba</option>
+              <option value="Ward 4">Ward 4 - Dibbur</option>
+              <option value="Ward 5">Ward 5 - Bheemasandra</option>
+              <option value="Ward 6">Ward 6 - Heggere</option>
+              <option value="Ward 7">Ward 7 - Melekote</option>
+              <option value="Ward 8">Ward 8 - Batawadi North</option>
+              <option value="Ward 9">Ward 9 - Batawadi South</option>
+              <option value="Ward 10">Ward 10 - Kyatsandra</option>
+              <option value="Ward 11">Ward 11 - Mandipet</option>
+              <option value="Ward 12">Ward 12 - Chickpet</option>
+              <option value="Ward 13">Ward 13 - Ashok Nagar</option>
+              <option value="Ward 14">Ward 14 - Gandhi Nagar</option>
+              <option value="Ward 15">Ward 15 - Vinayaka Nagar</option>
+              <option value="Ward 16">Ward 16 - Jayanagar East</option>
+              <option value="Ward 17">Ward 17 - Jayanagar West</option>
+              <option value="Ward 18">Ward 18 - SIT College Campus</option>
+              <option value="Ward 19">Ward 19 - Vidyanagar</option>
+              <option value="Ward 20">Ward 20 - SS Puram Main</option>
+              <option value="Ward 21">Ward 21 - SS Puram South</option>
+              <option value="Ward 22">Ward 22 - Upparhalli</option>
+              <option value="Ward 23">Ward 23 - Gubbi Gate Market</option>
+              <option value="Ward 24">Ward 24 - Shanthinagar</option>
+              <option value="Ward 25">Ward 25 - Hanumanthapura</option>
+              <option value="Ward 26">Ward 26 - Amanikere Lake</option>
+              <option value="Ward 27">Ward 27 - Sridevi Nagar</option>
+              <option value="Ward 28">Ward 28 - Saraswathipuram</option>
+              <option value="Ward 29">Ward 29 - Gokula Extension</option>
+              <option value="Ward 30">Ward 30 - Sathyamangala</option>
+              <option value="Ward 31">Ward 31 - Shettihalli</option>
+              <option value="Ward 32">Ward 32 - Devarayapatna</option>
+              <option value="Ward 33">Ward 33 - Kothitopu</option>
+              <option value="Ward 34">Ward 34 - Manjunathaswamy Layout</option>
+              <option value="Ward 35">Ward 35 - Obalapura</option>
             </select>
           </div>
           <button class="btn btn-glass btn-sm" id="btn-adm-refresh">🔄 Refresh Registry</button>

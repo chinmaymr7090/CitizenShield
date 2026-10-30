@@ -244,7 +244,7 @@ def create_report(user):
     priority = (form.get("priority") or "Normal").strip()
     description = (form.get("description") or "").strip()
     location = (form.get("location") or "").strip()
-    ward = (form.get("ward") or "Ward 112 - Central Division").strip()
+    ward = (form.get("ward") or "Ward 11 - Mandipet / Town Hall Division").strip()
 
     lat = form.get("latitude")
     lng = form.get("longitude")

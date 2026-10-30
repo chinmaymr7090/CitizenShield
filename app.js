@@ -26,8 +26,8 @@ import { StippleOrb } from './js/orb.js';
 
 // Global State
 let activeUser = null;
-let currentReportLat = 12.9716;
-let currentReportLng = 77.5946;
+let currentReportLat = 13.3414;
+let currentReportLng = 77.1022;
 let selectedEvidenceFile = null;
 let cachedCitizenReports = [];
 let cachedAdminReports = [];
@@ -712,10 +712,15 @@ function setupOfficerConsole() {
   const filterStatus = document.getElementById('adm-filter-status');
   const filterPriority = document.getElementById('adm-filter-priority');
   const filterCat = document.getElementById('adm-filter-category');
+  const filterWard = document.getElementById('adm-filter-ward');
 
   const onFilterChange = async () => {
+    let searchVal = searchInput.value.trim();
+    if (filterWard && filterWard.value !== 'ALL') {
+      searchVal = searchVal ? `${searchVal} ${filterWard.value}` : filterWard.value;
+    }
     const filters = {
-      search: searchInput.value.trim(),
+      search: searchVal,
       status: filterStatus.value,
       priority: filterPriority.value,
       category: filterCat.value
@@ -732,6 +737,9 @@ function setupOfficerConsole() {
   filterStatus.addEventListener('change', onFilterChange);
   filterPriority.addEventListener('change', onFilterChange);
   filterCat.addEventListener('change', onFilterChange);
+  if (filterWard) {
+    filterWard.addEventListener('change', onFilterChange);
+  }
 
   // Status Directive Update Modal Submission
   document.getElementById('btn-save-officer-directive').addEventListener('click', async () => {

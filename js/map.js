@@ -5,8 +5,8 @@ let reportMarker = null;
 let cityMapInstance = null;
 let cityMarkerGroup = null;
 
-// Default city center (Bengaluru Central Municipal Ward)
-const DEFAULT_CENTER = [12.9716, 77.5946];
+// Default city center (Tumakuru City Corporation / Town Hall Datum)
+const DEFAULT_CENTER = [13.3414, 77.1022];
 const DEFAULT_ZOOM = 13;
 
 /**
