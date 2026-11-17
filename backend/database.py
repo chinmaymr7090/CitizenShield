@@ -178,6 +178,39 @@ def init_db():
     );
     """)
 
+    # 7. Officer Replies to Citizens Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS officer_replies (
+        reply_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_id TEXT NOT NULL,
+        officer_id INTEGER NOT NULL,
+        officer_name TEXT,
+        officer_role TEXT,
+        reply_message TEXT NOT NULL,
+        previous_status TEXT,
+        new_status TEXT,
+        resolution_details TEXT,
+        after_repair_image TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (report_id) REFERENCES reports(report_id) ON DELETE CASCADE,
+        FOREIGN KEY (officer_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    """)
+
+    # 8. In-App User Notifications Table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        report_id TEXT,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    """)
+
     # --- Safe Migrations for Existing Tables ---
     def add_column_if_missing(table, column, col_type):
         cursor.execute(f"PRAGMA table_info({table})")

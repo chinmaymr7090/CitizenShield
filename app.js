@@ -16,6 +16,9 @@ import {
   apiGetAiMetrics,
   apiGetZonesSummary,
   apiGetZoneComplaints,
+  apiReplyToCitizen,
+  apiGetNotifications,
+  apiMarkNotificationRead,
   getCurrentUser, 
   getToken 
 } from './js/api.js';
@@ -80,6 +83,9 @@ async function initApp() {
 
   // 8. Wire modals
   setupModals();
+
+  // 8.5 Wire Notifications
+  setupNotifications();
 
   // 9. Load initial Home radar & statistics
   loadHomeOverview();
@@ -773,66 +779,98 @@ function renderCitizenList(reports) {
 }
 
 /**
- * Case Tracking Dossier View
+ * Case Tracking Dossier View with Vertical 10-Stage Milestone Pipeline
  */
 function setupTracking() {
-  const btnTrack = document.getElementById('btn-execute-tracking');
-  const inputTrack = document.getElementById('input-track-id');
+  const formTrack = document.getElementById('form-tracking-search');
+  const inputTrack = document.getElementById('track-search-input');
 
-  btnTrack.addEventListener('click', () => {
-    const id = inputTrack.value.trim();
-    if (!id) {
-      showToast("Please enter a valid Report Reference ID.", "warning");
-      return;
-    }
-    executeTrack(id);
-  });
-
-  inputTrack.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
+  if (formTrack) {
+    formTrack.addEventListener('submit', (e) => {
       e.preventDefault();
-      btnTrack.click();
-    }
-  });
+      const id = inputTrack.value.trim();
+      if (!id) {
+        showToast("Please enter a valid Report Reference ID.", "warning");
+        return;
+      }
+      executeTrack(id);
+    });
+  }
+
+  // Backward compatibility button/inputs if any
+  const btnLegacyTrack = document.getElementById('btn-execute-tracking');
+  const inputLegacyTrack = document.getElementById('input-track-id');
+  if (btnLegacyTrack && inputLegacyTrack) {
+    btnLegacyTrack.addEventListener('click', () => {
+      const id = inputLegacyTrack.value.trim();
+      if (id) executeTrack(id);
+    });
+  }
 
   window.inspectTrackReport = (reportId) => {
     navigate('view-tracking');
-    document.getElementById('input-track-id').value = reportId;
+    if (inputTrack) inputTrack.value = reportId;
+    if (inputLegacyTrack) inputLegacyTrack.value = reportId;
     executeTrack(reportId);
   };
 }
 
 async function executeTrack(reportId) {
-  const resultContainer = document.getElementById('tracking-result-dossier');
-  const btn = document.getElementById('btn-execute-tracking');
+  const resultContainer = document.getElementById('tracking-dossier-result') || document.getElementById('tracking-result-dossier');
+  const btn = document.getElementById('btn-search-track') || document.getElementById('btn-execute-tracking');
 
   try {
-    btn.disabled = true;
-    btn.textContent = 'Verifying Record...';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Verifying Record...';
+    }
 
     const r = await apiTrackReport(reportId);
 
-    document.getElementById('dossier-ref-code').textContent = r.tracking_id || r.report_id;
-    document.getElementById('dossier-lodged-date').textContent = r.created_at;
-    document.getElementById('dossier-title').textContent = r.title || r.complaint_title;
-    document.getElementById('dossier-dept').textContent = r.department;
-    document.getElementById('dossier-category').textContent = r.category;
-    document.getElementById('dossier-status-badge').innerHTML = getStatusPill(r.status);
-    document.getElementById('dossier-priority-badge').innerHTML = getPriorityPill(r.priority);
-    document.getElementById('dossier-ward').textContent = r.ward;
-    document.getElementById('dossier-location').textContent = r.location;
-    document.getElementById('dossier-sla').textContent = `${r.sla_hours || 48} Hours SLA`;
-    document.getElementById('dossier-description').textContent = r.description;
+    const refEl = document.getElementById('dossier-ref-id') || document.getElementById('dossier-ref-code');
+    if (refEl) refEl.textContent = r.tracking_id || r.report_id;
+    
+    const createdEl = document.getElementById('dossier-created') || document.getElementById('dossier-lodged-date');
+    if (createdEl) createdEl.textContent = r.created_at;
+
+    const titleEl = document.getElementById('dossier-title');
+    if (titleEl) titleEl.textContent = r.title || r.complaint_title;
+
+    const deptEl = document.getElementById('dossier-dept');
+    if (deptEl) deptEl.textContent = r.department;
+
+    const statusPill = document.getElementById('dossier-status-pill') || document.getElementById('dossier-status-badge');
+    if (statusPill) statusPill.innerHTML = getStatusPill(r.status);
+
+    const prioPill = document.getElementById('dossier-priority-pill') || document.getElementById('dossier-priority-badge');
+    if (prioPill) prioPill.innerHTML = getPriorityPill(r.priority);
+
+    const wardEl = document.getElementById('dossier-ward');
+    if (wardEl) wardEl.textContent = r.ward;
+
+    const locEl = document.getElementById('dossier-location');
+    if (locEl) locEl.textContent = r.location;
+
+    const slaEl = document.getElementById('dossier-sla');
+    if (slaEl) slaEl.textContent = `${r.sla_hours || 48} Hours SLA`;
+
+    const descEl = document.getElementById('dossier-description');
+    if (descEl) descEl.textContent = r.description;
 
     // AI Badge Box
     const aiBadgeBox = document.getElementById('dossier-ai-badge-box');
-    if (r.detected_class && r.detected_class !== 'No supported civic problem detected') {
-      aiBadgeBox.classList.remove('hidden');
-      document.getElementById('dossier-ai-class').textContent = r.detected_class;
-      document.getElementById('dossier-ai-conf').textContent = `${Math.round((r.confidence_score || 0.85) * 100)}%`;
-      document.getElementById('dossier-ai-model').textContent = r.model_name || 'YOLOv8';
-    } else {
-      aiBadgeBox.classList.add('hidden');
+    if (aiBadgeBox) {
+      if (r.detected_class && r.detected_class !== 'No supported civic problem detected') {
+        aiBadgeBox.classList.remove('hidden');
+        const cEl = document.getElementById('dossier-ai-class');
+        if (cEl) cEl.textContent = r.detected_class;
+        const confEl = document.getElementById('dossier-ai-conf');
+        if (confEl) confEl.textContent = `${Math.round((r.confidence_score || 0.85) * 100)}%`;
+        const mEl = document.getElementById('dossier-ai-model');
+        if (mEl) mEl.textContent = r.model_name || 'YOLOv8';
+      } else {
+        aiBadgeBox.classList.add('hidden');
+      }
     }
 
     // Evidence Photo
@@ -840,50 +878,186 @@ async function executeTrack(reportId) {
     const photoImg = document.getElementById('dossier-photo');
     if (r.image_filename || r.image_path) {
       const imgFile = r.image_filename || r.image_path;
-      photoImg.src = `/api/uploads/${imgFile}`;
-      photoContainer.classList.remove('hidden');
+      if (photoImg) photoImg.src = `/api/uploads/${imgFile}`;
+      if (photoContainer) photoContainer.classList.remove('hidden');
     } else {
-      photoContainer.classList.add('hidden');
+      if (photoContainer) photoContainer.classList.add('hidden');
     }
 
     // After Repair Photo (if resolved)
     const afterContainer = document.getElementById('dossier-after-photo-container');
     const afterImg = document.getElementById('dossier-after-photo');
     if (r.after_repair_image) {
-      afterImg.src = `/api/uploads/${r.after_repair_image}`;
-      afterContainer.classList.remove('hidden');
+      if (afterImg) afterImg.src = `/api/uploads/${r.after_repair_image}`;
+      if (afterContainer) afterContainer.classList.remove('hidden');
     } else {
-      afterContainer.classList.add('hidden');
+      if (afterContainer) afterContainer.classList.add('hidden');
+    }
+
+    // Official Officer Replies List
+    const repliesContainer = document.getElementById('dossier-replies-container');
+    const repliesList = document.getElementById('dossier-replies-list');
+    const replies = r.officer_replies || [];
+    if (repliesContainer && repliesList) {
+      if (replies.length > 0) {
+        repliesContainer.classList.remove('hidden');
+        repliesList.innerHTML = '';
+        replies.forEach((rep, idx) => {
+          const item = document.createElement('div');
+          item.className = 'officer-reply-card';
+          item.style.cssText = `
+            padding: 14px 16px;
+            background: rgba(14, 42, 53, 0.75);
+            border: 1px solid var(--lagoon-border-bright);
+            border-left: 4px solid var(--teal-light);
+            border-radius: var(--radius-sm);
+          `;
+          item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <strong style="color: var(--teal-light); font-size: 0.95rem;">👮 ${escapeHtml(rep.officer_name || 'Municipal Officer')}</strong>
+                <span class="role-tag admin" style="margin-left: 6px; font-size: 0.72rem;">${escapeHtml(rep.officer_role || 'Directorate')}</span>
+                ${idx === 0 ? '<span class="badge-pill" style="margin-left: 6px; background: rgba(16, 185, 129, 0.2); color: #4ade80; border: 1px solid #16a34a; font-size: 0.72rem; padding: 2px 6px;">LATEST DIRECTIVE</span>' : ''}
+              </div>
+              <span style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(rep.created_at)}</span>
+            </div>
+            <div style="font-size: 0.92rem; color: #f1f5f9; line-height: 1.5; margin-top: 4px;">
+              ${escapeHtml(rep.reply_message)}
+            </div>
+            <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-dim); display: flex; gap: 12px; align-items: center;">
+              <span>Grievance Stage: <strong>${escapeHtml(rep.new_status || r.status)}</strong></span>
+              ${rep.after_repair_image ? `<span style="color: var(--mint-glow);">📸 Verification photo attached</span>` : ''}
+            </div>
+          `;
+          repliesList.appendChild(item);
+        });
+      } else {
+        repliesContainer.classList.add('hidden');
+      }
+    }
+
+    // 10-Stage Milestone Pipeline Tracker
+    const stagesTracker = document.getElementById('dossier-stages-tracker');
+    if (stagesTracker) {
+      stagesTracker.innerHTML = '';
+      
+      const ALL_10_STAGES = [
+        { id: 1, name: "Complaint Submitted", key: "submitted", desc: "Citizen complaint safely logged into persistent database" },
+        { id: 2, name: "Received by Municipal Department", key: "received", desc: "Zonal control room acknowledged the dossier" },
+        { id: 3, name: "Department Assigned", key: "dept_assigned", desc: `Dispatched to ${r.department || 'Department'}` },
+        { id: 4, name: "Officer Assigned", key: "officer_assigned", desc: "Municipal Field Officer assigned for site inspection" },
+        { id: 5, name: "Field Inspection Started", key: "inspect_start", desc: "On-site assessment of defect severity initiated" },
+        { id: 6, name: "Inspection Completed", key: "inspect_done", desc: "Technical inspection report compiled by zonal engineer" },
+        { id: 7, name: "Work Order Issued", key: "work_order", desc: "Repair ticket approved & contractor materials allocated" },
+        { id: 8, name: "Repair Work Started", key: "repair_started", desc: "Active civil / electrical / sanitisation remediation in progress" },
+        { id: 9, name: "Complaint Resolved", key: "resolved", desc: "Field rectification verified with mandatory photo evidence" },
+        { id: 10, name: "Citizen Feedback Received", key: "feedback", desc: "Citizen satisfaction confirmed and case archived" }
+      ];
+
+      // Determine active milestone based on real database records
+      let currentStageIdx = 1; // 1: Submitted
+      if (r.department) currentStageIdx = Math.max(currentStageIdx, 3);
+      if (r.status === 'Under Review') currentStageIdx = Math.max(currentStageIdx, 5);
+      if (r.status === 'In Progress') currentStageIdx = Math.max(currentStageIdx, 8);
+      if (r.status === 'Resolved') currentStageIdx = 9;
+
+      const history = r.status_history || [];
+      const historyTimestamps = {};
+      history.forEach(h => {
+        if (h.new_status === 'Submitted' || h.status === 'Submitted') historyTimestamps[1] = h.created_at;
+        if (h.new_status === 'Under Review' || h.status === 'Under Review') {
+          historyTimestamps[4] = h.created_at;
+          historyTimestamps[5] = h.created_at;
+          historyTimestamps[6] = h.created_at;
+        }
+        if (h.new_status === 'In Progress' || h.status === 'In Progress') {
+          historyTimestamps[7] = h.created_at;
+          historyTimestamps[8] = h.created_at;
+        }
+        if (h.new_status === 'Resolved' || h.status === 'Resolved') {
+          historyTimestamps[9] = h.created_at;
+        }
+      });
+      if (!historyTimestamps[1]) historyTimestamps[1] = r.created_at;
+
+      ALL_10_STAGES.forEach(st => {
+        const isCompleted = st.id < currentStageIdx || (st.id === 9 && r.status === 'Resolved');
+        const isCurrent = (st.id === currentStageIdx && r.status !== 'Resolved') || (st.id === 9 && r.status === 'Resolved');
+        const isPending = !isCompleted && !isCurrent;
+
+        const stageRow = document.createElement('div');
+        stageRow.style.cssText = `
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+          padding: 10px 14px;
+          border-radius: var(--radius-sm);
+          background: ${isCurrent ? 'rgba(6, 182, 212, 0.12)' : (isCompleted ? 'rgba(16, 185, 129, 0.06)' : 'rgba(255, 255, 255, 0.02)')};
+          border: 1px solid ${isCurrent ? 'var(--teal-light)' : (isCompleted ? 'rgba(16, 185, 129, 0.3)' : 'rgba(255, 255, 255, 0.06)')};
+          transition: all 0.2s ease;
+        `;
+
+        const circleIcon = isCompleted ? '✓' : (isCurrent ? '▶' : st.id);
+        const circleBg = isCompleted ? 'var(--mint-glow)' : (isCurrent ? 'var(--teal-light)' : 'rgba(255, 255, 255, 0.15)');
+        const circleColor = (isCompleted || isCurrent) ? '#051318' : 'var(--text-muted)';
+        const stageTime = historyTimestamps[st.id] || (isCompleted || isCurrent ? r.updated_at : '');
+
+        stageRow.innerHTML = `
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: ${circleBg}; color: ${circleColor}; font-weight: 800; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;">
+            ${circleIcon}
+          </div>
+          <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+              <strong style="color: ${isCurrent ? '#38bdf8' : (isCompleted ? '#4ade80' : 'var(--text-muted)')}; font-size: 0.92rem;">
+                ${st.id}. ${st.name}
+              </strong>
+              ${isCurrent ? '<span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(56, 189, 248, 0.2); color: #38bdf8; font-weight: 700;">CURRENT STAGE</span>' : ''}
+              ${stageTime ? `<span style="font-size: 0.78rem; color: var(--text-muted); font-family: var(--font-mono);">${stageTime}</span>` : ''}
+            </div>
+            <div style="font-size: 0.8rem; color: ${isPending ? 'var(--text-dim)' : '#cbd5e1'}; margin-top: 2px;">
+              ${st.desc}
+            </div>
+          </div>
+        `;
+        stagesTracker.appendChild(stageRow);
+      });
     }
 
     // Audit Timeline
     const timeline = document.getElementById('dossier-timeline');
-    timeline.innerHTML = '';
+    if (timeline) {
+      timeline.innerHTML = '';
+      const history = r.status_history || [];
+      if (history.length === 0) {
+        timeline.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 12px;">No status events recorded yet.</div>';
+      } else {
+        history.forEach(step => {
+          const node = document.createElement('div');
+          node.className = 'audit-node';
+          node.innerHTML = `
+            <div class="audit-content">
+              <div class="audit-heading">
+                <span class="audit-title">${escapeHtml(step.new_status || step.status)} — ${escapeHtml(step.officer_name || step.updated_by || 'Municipal Authority')}</span>
+                <span class="audit-time">${escapeHtml(step.created_at)}</span>
+              </div>
+              <div class="audit-remarks">${escapeHtml(step.officer_remarks || step.remarks || 'No remarks provided')}</div>
+            </div>
+          `;
+          timeline.appendChild(node);
+        });
+      }
+    }
 
-    const history = r.status_history || [];
-    history.forEach(step => {
-      const node = document.createElement('div');
-      node.className = 'audit-node';
-      node.innerHTML = `
-        <div class="audit-content">
-          <div class="audit-heading">
-            <span class="audit-title">${escapeHtml(step.new_status || step.status)} — ${escapeHtml(step.officer_name || step.updated_by || 'Municipal Authority')}</span>
-            <span class="audit-time">${escapeHtml(step.created_at)}</span>
-          </div>
-          <div class="audit-remarks">${escapeHtml(step.officer_remarks || step.remarks)}</div>
-        </div>
-      `;
-      timeline.appendChild(node);
-    });
-
-    resultContainer.classList.remove('hidden');
+    if (resultContainer) resultContainer.classList.remove('hidden');
     showToast(`Dossier loaded for ${r.report_id}`, "success");
   } catch (err) {
-    resultContainer.classList.add('hidden');
+    if (resultContainer) resultContainer.classList.add('hidden');
     showToast(err.message, "error");
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Inspect Case Dossier';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Inspect Case Dossier';
+    }
   }
 }
 
@@ -1088,8 +1262,8 @@ function renderAdminTable(reports) {
       <td style="max-width: 180px; font-size: 0.82rem;">${escapeHtml(r.ward)}<br><span style="color: var(--text-muted);">${escapeHtml(r.location)}</span></td>
       <td>${getStatusPill(r.status)}</td>
       <td>
-        <button class="btn btn-lagoon btn-sm" onclick="window.openOfficerDirectiveModal('${r.report_id}', '${escapeAttr(r.title || r.complaint_title)}', '${r.status}', '${r.department}', '${r.priority}')">
-          Directive ⚙️
+        <button class="btn btn-lagoon btn-sm" onclick="window.openOfficerDirectiveModal('${r.report_id}', '${escapeAttr(r.title || r.complaint_title)}', '${r.status}', '${r.department}', '${r.priority}')" title="Send Official Reply & Directives">
+          💬 Reply to Citizen
         </button>
       </td>
     `;
@@ -1524,6 +1698,98 @@ function closeModal(id) {
 }
 
 window.citizenShieldCloseModal = closeModal;
+
+/**
+ * Module 4: Live Notifications & Periodic Polling
+ */
+let notifPollInterval = null;
+
+function setupNotifications() {
+  const bellBtn = document.getElementById('notif-bell-btn');
+  if (bellBtn) {
+    bellBtn.addEventListener('click', () => {
+      openModal('modal-notifications');
+      renderNotificationsModal();
+    });
+  }
+
+  // Poll for notifications every 20 seconds if user logged in
+  if (notifPollInterval) clearInterval(notifPollInterval);
+  notifPollInterval = setInterval(() => {
+    checkUnreadNotifications();
+  }, 20000);
+
+  checkUnreadNotifications();
+}
+
+async function checkUnreadNotifications() {
+  if (!getToken()) return;
+  try {
+    const notifs = await apiGetNotifications();
+    const unreadCount = notifs.filter(n => !n.is_read).length;
+    const badge = document.getElementById('notif-unread-badge');
+    if (badge) {
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+  } catch (e) {
+    // Session may be guest or token expired
+  }
+}
+
+async function renderNotificationsModal() {
+  const container = document.getElementById('notif-list-container');
+  if (!container) return;
+  container.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px;">Fetching latest municipal notifications...</div>';
+
+  try {
+    const notifs = await apiGetNotifications();
+    if (notifs.length === 0) {
+      container.innerHTML = '<div style="color: var(--mint-glow); text-align: center; padding: 24px;">✓ No unread notifications. You are up to date!</div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    notifs.forEach(n => {
+      const card = document.createElement('div');
+      card.style.cssText = `
+        padding: 12px 14px;
+        background: ${n.is_read ? 'rgba(8, 29, 36, 0.5)' : 'rgba(14, 42, 53, 0.9)'};
+        border: 1px solid ${n.is_read ? 'var(--lagoon-border)' : 'var(--teal-light)'};
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      `;
+      card.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: #ffffff; font-size: 0.88rem;">${escapeHtml(n.title)}</strong>
+          <span style="font-size: 0.74rem; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(n.created_at)}</span>
+        </div>
+        <div style="font-size: 0.82rem; color: var(--text-dim); line-height: 1.4;">${escapeHtml(n.message)}</div>
+        <div style="font-size: 0.75rem; color: var(--teal-light); margin-top: 4px;">Click to view complaint dossier &amp; timeline →</div>
+      `;
+      card.onclick = async () => {
+        if (!n.is_read) {
+          await apiMarkNotificationRead(n.id);
+          checkUnreadNotifications();
+        }
+        closeModal('modal-notifications');
+        if (n.report_id) {
+          window.inspectTrackReport(n.report_id);
+        }
+      };
+      container.appendChild(card);
+    });
+  } catch (err) {
+    container.innerHTML = `<div style="color: var(--status-urgent); text-align: center; padding: 20px;">Failed to load notifications: ${err.message}</div>`;
+  }
+}
 
 export function showToast(message, type = 'info', duration = 5000) {
   const shelf = document.getElementById('toast-shelf');

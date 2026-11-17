@@ -42,7 +42,7 @@
           <li><button class="nav-menu-btn active" data-view-target="view-home">Overview</button></li>
           <li><button class="nav-menu-btn" data-view-target="view-submit">Lodge Grievance</button></li>
           <li><button class="nav-menu-btn" data-view-target="view-citizen-dashboard" id="nav-my-dossier">My Dossier</button></li>
-          <li><button class="nav-menu-btn" data-view-target="view-tracking">Case Tracker</button></li>
+          <li><button class="nav-menu-btn" data-view-target="view-tracking" id="nav-case-tracker">My Complaint Tracking</button></li>
           <li><button class="nav-menu-btn" data-view-target="view-gis-map">Live GIS Radar</button></li>
           <li><button class="nav-menu-btn hidden" data-view-target="view-zone-monitoring" id="nav-zone-monitoring">Live Zone Monitoring</button></li>
           <li><button class="nav-menu-btn hidden" data-view-target="view-ai-dashboard" id="nav-ai-dashboard">AI Analytics</button></li>
@@ -51,7 +51,12 @@
       </nav>
 
       <div class="nav-actions">
-        <div id="user-profile-badge" class="user-session-pill hidden">
+        <div id="user-profile-badge" class="user-session-pill hidden" style="display: flex; align-items: center; gap: 8px;">
+          <!-- Notification Bell Indicator -->
+          <div id="notif-bell-btn" style="position: relative; cursor: pointer; padding: 4px 8px; border-radius: 6px; background: rgba(6, 182, 212, 0.1); border: 1px solid var(--lagoon-border);" title="Officer Replies & Updates">
+            <span style="font-size: 1.1rem;">🔔</span>
+            <span id="notif-unread-badge" class="hidden" style="position: absolute; top: -4px; right: -4px; background: #ef4444; color: #fff; font-size: 0.68rem; font-weight: 800; border-radius: 10px; padding: 1px 5px; min-width: 14px; text-align: center;">0</span>
+          </div>
           <span id="header-user-name" style="font-weight: 700; color: #ffffff;">Citizen</span>
           <span class="role-tag" id="header-user-role">Citizen</span>
           <button class="btn btn-glass btn-sm" id="btn-global-logout" style="padding: 4px 10px;">Logout</button>
@@ -653,6 +658,20 @@
                 <img id="dossier-after-photo" src="" alt="After repair photo" style="max-height: 220px; border-radius: var(--radius-sm); border: 1px solid var(--mint-glow);">
               </div>
 
+              <!-- Official Officer Replies Section -->
+              <div id="dossier-replies-container" class="hidden" style="margin-bottom: 24px;">
+                <div class="dossier-field-label" style="margin-bottom: 10px; color: var(--aqua-foam); display: flex; align-items: center; gap: 8px;">
+                  <span>💬 Official Municipal Officer Replies &amp; Citizen Directives:</span>
+                </div>
+                <div id="dossier-replies-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+              </div>
+
+              <!-- Official 10-Stage Milestone Tracking Timeline -->
+              <div style="margin-bottom: 24px;">
+                <div class="dossier-field-label" style="margin-bottom: 12px; color: var(--teal-light);">Official 10-Stage Municipal Progress Pipeline:</div>
+                <div class="stages-tracker" id="dossier-stages-tracker" style="display: flex; flex-direction: column; gap: 8px;"></div>
+              </div>
+
               <!-- Audit Timeline -->
               <div>
                 <div class="dossier-field-label" style="margin-bottom: 12px;">Immutable Municipal Audit History &amp; Directives:</div>
@@ -1155,6 +1174,24 @@
   <!-- Toast Shelf -->
   <div class="toast-shelf" id="toast-shelf" aria-live="polite"></div>
 
+  <!-- MODAL: NOTIFICATIONS DRAWER -->
+  <div id="modal-notifications" class="modal-backdrop hidden" role="dialog" aria-modal="true" style="z-index: 2500;">
+    <div class="modal-dialog" style="max-width: 550px;">
+      <div class="modal-dialog-header">
+        <span class="modal-dialog-title">🔔 Official Directives &amp; Notifications</span>
+        <button type="button" class="modal-dialog-close" data-modal-close="modal-notifications" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-notifications')">&times;</button>
+      </div>
+      <div class="modal-dialog-body" style="padding: 20px;">
+        <div id="notif-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto;">
+          <div style="color: var(--text-muted); text-align: center; padding: 24px;">Loading notifications...</div>
+        </div>
+      </div>
+      <div class="modal-dialog-footer">
+        <button type="button" class="btn btn-glass btn-sm" data-modal-close="modal-notifications" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-notifications')">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- FOOTER -->
   <footer class="stipple-footer">
     <p class="tagline">CitizenShield safeguards municipal infrastructure in the moments that matter most.</p>
@@ -1166,6 +1203,6 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Application Bootstrap (Cache-busted) -->
-  <script type="module" src="app.js?v=2.5"></script>
+  <script type="module" src="app.js?v=2.6"></script>
 </body>
 </html>

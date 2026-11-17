@@ -179,7 +179,9 @@ export async function apiUpdateReportStatus(reportId, newStatus, remarks, depart
   if (afterImageFile) {
     const fd = new FormData();
     fd.append("status", newStatus);
+    fd.append("new_status", newStatus);
     fd.append("remarks", remarks);
+    fd.append("reply_message", remarks);
     if (department) fd.append("department", department);
     if (priority) fd.append("priority", priority);
     fd.append("after_image", afterImageFile);
@@ -187,15 +189,62 @@ export async function apiUpdateReportStatus(reportId, newStatus, remarks, depart
   } else {
     body = JSON.stringify({
       status: newStatus,
+      new_status: newStatus,
       remarks,
+      reply_message: remarks,
       department,
       priority
     });
   }
 
-  return await request(`/api/reports/${encodeURIComponent(reportId)}/status`, {
-    method: "PATCH",
+  // Use the dedicated officer reply endpoint for full transactional audit, replies and citizen notifications
+  return await request(`/api/reports/${encodeURIComponent(reportId)}/reply`, {
+    method: "POST",
     body: body
+  });
+}
+
+// Module 2 & 4: Officer Replies & Notifications API
+export async function apiReplyToCitizen(reportId, replyMessage, newStatus = "", department = "", priority = "", afterImageFile = null, resolutionDetails = "") {
+  let body;
+  if (afterImageFile) {
+    const fd = new FormData();
+    fd.append("reply_message", replyMessage);
+    if (newStatus) fd.append("new_status", newStatus);
+    if (department) fd.append("department", department);
+    if (priority) fd.append("priority", priority);
+    if (resolutionDetails) fd.append("resolution_details", resolutionDetails);
+    fd.append("after_image", afterImageFile);
+    body = fd;
+  } else {
+    body = JSON.stringify({
+      reply_message: replyMessage,
+      new_status: newStatus,
+      department,
+      priority,
+      resolution_details: resolutionDetails
+    });
+  }
+
+  return await request(`/api/reports/${encodeURIComponent(reportId)}/reply`, {
+    method: "POST",
+    body: body
+  });
+}
+
+export async function apiGetReportReplies(reportId) {
+  const data = await request(`/api/reports/${encodeURIComponent(reportId)}/replies`);
+  return data.replies || [];
+}
+
+export async function apiGetNotifications() {
+  const data = await request("/api/notifications");
+  return data.notifications || [];
+}
+
+export async function apiMarkNotificationRead(notifId) {
+  return await request(`/api/notifications/${notifId}/read`, {
+    method: "POST"
   });
 }
 

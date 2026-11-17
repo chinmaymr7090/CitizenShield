@@ -535,6 +535,15 @@ def track_report(report_id):
 
     report_dict = dict(report)
 
+    # Privacy and Authorization Check if user is logged in
+    current_usr = get_current_user()
+    if current_usr:
+        # If user is citizen and not admin/officer, they can only track their own complaints
+        if current_usr.get("role") not in ["admin", "officer", "engineer"] and report_dict.get("user_id"):
+            if current_usr["id"] != report_dict["user_id"]:
+                conn.close()
+                return jsonify({"error": "Access Denied: You are not authorized to view grievance details registered by another citizen."}), 403
+
     cursor.execute("""
         SELECT status, new_status, remarks, officer_remarks, officer_name, officer_role, updated_by, created_at
         FROM status_history
@@ -543,6 +552,17 @@ def track_report(report_id):
     """, (report_dict["report_id"],))
     history = [dict(h) for h in cursor.fetchall()]
     report_dict["status_history"] = history
+
+    # Fetch Officer Replies
+    cursor.execute("""
+        SELECT reply_id, report_id, officer_id, officer_name, officer_role, reply_message,
+               previous_status, new_status, resolution_details, after_repair_image, created_at
+        FROM officer_replies
+        WHERE report_id = ?
+        ORDER BY created_at DESC
+    """, (report_dict["report_id"],))
+    replies = [dict(rep) for rep in cursor.fetchall()]
+    report_dict["officer_replies"] = replies
 
     conn.close()
     return jsonify({"report": report_dict})
@@ -637,7 +657,7 @@ def update_report_status(user, report_id):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, status, title, after_repair_image FROM reports WHERE report_id = ? OR tracking_id = ?", (clean_id, clean_id))
+    cursor.execute("SELECT id, user_id, status, title, after_repair_image FROM reports WHERE report_id = ? OR tracking_id = ?", (clean_id, clean_id))
     report = cursor.fetchone()
     if not report:
         conn.close()
@@ -684,6 +704,29 @@ def update_report_status(user, report_id):
         now_str, now_str
     ))
 
+    # Module 2 & 4: Record Officer Reply and Notify Citizen
+    cursor.execute("""
+        INSERT INTO officer_replies (
+            report_id, officer_id, officer_name, officer_role, reply_message,
+            previous_status, new_status, resolution_details, after_repair_image, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        clean_id, user["id"], user["name"], user.get("role", "Officer").title(),
+        remarks, current_status, new_status,
+        remarks if new_status == "Resolved" else None,
+        after_image_name if new_status == "Resolved" else None,
+        now_str
+    ))
+
+    # Send in-app notification to the citizen
+    if report["user_id"]:
+        notif_title = f"Official Directive: {clean_id} is now {new_status}"
+        notif_msg = f"{user['name']} issued an update: {remarks[:140]}"
+        cursor.execute("""
+            INSERT INTO notifications (user_id, report_id, title, message, is_read, created_at)
+            VALUES (?, ?, ?, ?, 0, ?)
+        """, (report["user_id"], clean_id, notif_title, notif_msg, now_str))
+
     conn.commit()
     conn.close()
 
@@ -697,6 +740,167 @@ def update_report_status(user, report_id):
         "remarks": remarks,
         "after_repair_image": after_image_name
     })
+
+# ==========================================================
+# MODULE 2 & 4: DEDICATED OFFICER REPLY & NOTIFICATIONS API
+# ==========================================================
+
+@app.route("/api/reports/<report_id>/reply", methods=["POST"])
+@require_admin
+def reply_to_citizen(user, report_id):
+    """
+    Dedicated endpoint for Municipal Officers to send official replies to citizens.
+    Supports official replies, status transitions, department reassignment,
+    inspection remarks, and post-repair photographic verification.
+    """
+    clean_id = (report_id or "").strip().upper()
+    
+    if request.content_type and "multipart/form-data" in request.content_type:
+        form = request.form
+        files = request.files
+    else:
+        form = request.get_json(silent=True) or {}
+        files = {}
+
+    reply_message = (form.get("reply_message") or form.get("remarks") or "").strip()
+    new_status = form.get("new_status") or form.get("status")
+    department = form.get("department")
+    priority = form.get("priority")
+    resolution_details = (form.get("resolution_details") or "").strip()
+
+    if not reply_message:
+        return jsonify({"error": "Mandatory: Please enter an official reply message for the citizen."}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, user_id, status, title, department, priority, after_repair_image FROM reports WHERE report_id = ? OR tracking_id = ?", (clean_id, clean_id))
+    report = cursor.fetchone()
+    if not report:
+        conn.close()
+        return jsonify({"error": f"No municipal complaint found for reference {clean_id}."}), 404
+
+    current_status = report["status"]
+    status_to_set = new_status if new_status and new_status in ["Submitted", "Under Review", "Dispatched", "In Progress", "Resolved", "Rejected"] else current_status
+    after_image_name = report["after_repair_image"]
+
+    if status_to_set == "Resolved":
+        if "after_image" in files:
+            a_file = files["after_image"]
+            if a_file and a_file.filename and allowed_file(a_file.filename):
+                ext = a_file.filename.rsplit('.', 1)[1].lower()
+                after_image_name = f"resolved_{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:8]}.{ext}"
+                a_file.save(os.path.join(UPLOADS_DIR, after_image_name))
+        
+        if not after_image_name:
+            conn.close()
+            return jsonify({
+                "error": "Statutory Requirement: An after-repair verification photograph is strictly required before marking a civic defect as Resolved."
+            }), 400
+
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    # Update reports table
+    cursor.execute("""
+        UPDATE reports
+        SET status = ?, admin_remarks = ?, after_repair_image = ?,
+            department = COALESCE(?, department),
+            priority = COALESCE(?, priority),
+            updated_at = ?
+        WHERE report_id = ? OR tracking_id = ?
+    """, (status_to_set, reply_message, after_image_name, department or None, priority or None, now_str, clean_id, clean_id))
+
+    # Insert into officer_replies
+    cursor.execute("""
+        INSERT INTO officer_replies (
+            report_id, officer_id, officer_name, officer_role, reply_message,
+            previous_status, new_status, resolution_details, after_repair_image, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        clean_id, user["id"], user["name"], user.get("role", "Officer").title(),
+        reply_message, current_status, status_to_set,
+        resolution_details or (reply_message if status_to_set == "Resolved" else None),
+        after_image_name if status_to_set == "Resolved" else None,
+        now_str
+    ))
+
+    # Append to status_history if status changed or remarks issued
+    cursor.execute("""
+        INSERT INTO status_history (
+            report_id, previous_status, new_status, status, remarks, officer_remarks,
+            officer_name, officer_role, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        clean_id, current_status, status_to_set, status_to_set, reply_message, reply_message,
+        user["name"], user.get("role", "Officer").title(), user["name"],
+        now_str, now_str
+    ))
+
+    # Create citizen notification
+    if report["user_id"]:
+        notif_title = f"Official Reply on {clean_id}: {status_to_set}"
+        notif_msg = f"{user['name']}: {reply_message[:140]}"
+        cursor.execute("""
+            INSERT INTO notifications (user_id, report_id, title, message, is_read, created_at)
+            VALUES (?, ?, ?, ?, 0, ?)
+        """, (report["user_id"], clean_id, notif_title, notif_msg, now_str))
+
+    conn.commit()
+    conn.close()
+
+    log_audit("OFFICER_REPLY_SENT", f"Officer {user['name']} replied to {clean_id} (Status: {status_to_set}): {reply_message}", user["email"])
+
+    return jsonify({
+        "message": "Official Directive & Reply Published Successfully.",
+        "report_id": clean_id,
+        "previous_status": current_status,
+        "new_status": status_to_set,
+        "reply_message": reply_message,
+        "officer_name": user["name"],
+        "after_repair_image": after_image_name
+    })
+
+@app.route("/api/reports/<report_id>/replies", methods=["GET"])
+def get_report_replies(report_id):
+    clean_id = (report_id or "").strip().upper()
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT reply_id, report_id, officer_id, officer_name, officer_role, reply_message,
+               previous_status, new_status, resolution_details, after_repair_image, created_at
+        FROM officer_replies
+        WHERE report_id = ?
+        ORDER BY created_at DESC
+    """, (clean_id,))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({"replies": rows})
+
+@app.route("/api/notifications", methods=["GET"])
+@require_auth
+def get_user_notifications(user):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, report_id, title, message, is_read, created_at
+        FROM notifications
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 50
+    """, (user["id"],))
+    rows = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({"notifications": rows})
+
+@app.route("/api/notifications/<int:notif_id>/read", methods=["POST"])
+@require_auth
+def mark_notification_read(user, notif_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?", (notif_id, user["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True})
 
 # ==========================================================
 # MODULE: LIVE COLOUR-CODED COMPLAINT ZONE MONITORING
