@@ -1300,12 +1300,27 @@ body {
 }
 
 .modal-dialog-close {
-  background: none;
-  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
   color: var(--text-dim);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   cursor: pointer;
   line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  z-index: 10;
+}
+
+.modal-dialog-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+  transform: scale(1.05);
 }
 
 .modal-dialog-body {

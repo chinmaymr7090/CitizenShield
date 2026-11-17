@@ -44,6 +44,8 @@
           <li><button class="nav-menu-btn" data-view-target="view-citizen-dashboard" id="nav-my-dossier">My Dossier</button></li>
           <li><button class="nav-menu-btn" data-view-target="view-tracking">Case Tracker</button></li>
           <li><button class="nav-menu-btn" data-view-target="view-gis-map">Live GIS Radar</button></li>
+          <li><button class="nav-menu-btn hidden" data-view-target="view-zone-monitoring" id="nav-zone-monitoring">Live Zone Monitoring</button></li>
+          <li><button class="nav-menu-btn hidden" data-view-target="view-ai-dashboard" id="nav-ai-dashboard">AI Analytics</button></li>
           <li><button class="nav-menu-btn hidden" data-view-target="view-admin-dashboard" id="nav-officer-console">Officer Console</button></li>
         </ul>
       </nav>
@@ -428,19 +430,73 @@
                 </div>
               </div>
 
-              <!-- Evidence Photo Upload -->
+              <!-- Evidence Photo Upload with Instant Real AI Vision Scan -->
               <div class="form-group col-span-2">
-                <label class="form-label" for="lodge-image">Evidence Photo Attachment (Optional)</label>
+                <label class="form-label" for="lodge-image">Evidence Photo Attachment &amp; Real AI Analysis</label>
                 <input type="file" id="lodge-image" class="form-input" accept="image/jpeg,image/png,image/webp">
-                <div class="form-hint">Maximum image size: 10 MB. Stored permanently in the uploads vault.</div>
-                <div id="lodge-img-preview-box" class="hidden" style="margin-top: 10px;">
-                  <img id="lodge-img-preview" src="" alt="Evidence preview" style="max-height: 180px; border-radius: var(--radius-sm); border: 1px solid var(--lagoon-border);">
+                <div class="form-hint">Maximum image size: 15 MB. Upload triggers real computer vision model (YOLOv8 + OpenCV) to inspect civic defects.</div>
+
+                <!-- AI Scanning Indicator -->
+                <div id="ai-scanning-progress" class="hidden" style="margin-top: 12px; padding: 12px; border-radius: var(--radius-sm); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3);">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="emergency-pulse-beacon" style="background: var(--teal-light);"></span>
+                    <span style="font-size: 0.9rem; font-weight: 600; color: var(--teal-light);">Running Computer Vision Inference (YOLOv8 &amp; OpenCV)...</span>
+                  </div>
                 </div>
+
+                <!-- Real AI Vision Scan Result Display -->
+                <div id="ai-scan-result-card" class="hidden" style="margin-top: 14px; padding: 16px; border-radius: var(--radius-sm); background: rgba(8, 29, 36, 0.85); border: 1px solid var(--teal-light);">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div>
+                      <div class="section-tag" style="margin-bottom: 4px;">Real AI Vision Detection</div>
+                      <h4 id="ai-detected-title" style="margin: 0; font-size: 1.15rem; color: #ffffff; font-weight: 700;">Pothole Detected</h4>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Confidence Score</div>
+                      <div id="ai-confidence-badge" class="stream-value" style="font-size: 1.25rem; color: var(--mint-glow);">88%</div>
+                    </div>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; font-size: 0.88rem;">
+                    <div><span style="color: var(--text-muted);">Model Engine:</span> <span id="ai-model-name" style="color: var(--teal-light); font-family: var(--font-mono);">YOLOv8-Road-Distress-v1</span></div>
+                    <div><span style="color: var(--text-muted);">Suggested Category:</span> <strong id="ai-suggested-cat" style="color: #ffffff;">Roads and Transport</strong></div>
+                    <div><span style="color: var(--text-muted);">Suggested Priority:</span> <span id="ai-suggested-prio" class="priority-pill" style="display: inline-block;">High</span></div>
+                  </div>
+
+                  <!-- Citizen Confirmation Banner -->
+                  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 14px; background: rgba(16, 185, 129, 0.12); border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.3);">
+                    <span style="font-size: 0.85rem; color: #a7f3d0;">✓ AI suggested category auto-applied. You may confirm or manually change the dropdown above if needed.</span>
+                    <button type="button" class="btn btn-lagoon btn-sm" id="btn-ai-confirm-cat">Confirm AI Category</button>
+                  </div>
+                </div>
+
+                <!-- Duplicate Complaint Warning Banner -->
+                <div id="duplicate-warning-banner" class="hidden" style="margin-top: 14px; padding: 14px 18px; border-radius: var(--radius-sm); background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4);">
+                  <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <span style="font-size: 1.3rem;">⚠️</span>
+                    <div>
+                      <div style="font-weight: 700; color: #fde68a; font-size: 0.95rem;">Nearby Active Grievance Detected</div>
+                      <p id="duplicate-warning-text" style="font-size: 0.85rem; color: #fef3c7; margin: 4px 0 0 0;">A similar active complaint was reported within 75 meters of this location.</p>
+                      <div id="duplicate-nearby-list" style="margin-top: 8px; font-size: 0.8rem; color: #e2e8f0;"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="lodge-img-preview-box" class="hidden" style="margin-top: 12px;">
+                  <img id="lodge-img-preview" src="" alt="Evidence preview" style="max-height: 200px; border-radius: var(--radius-sm); border: 1px solid var(--lagoon-border);">
+                </div>
+
+                <!-- Hidden inputs to hold AI detection fields -->
+                <input type="hidden" id="ai-detected-class-input">
+                <input type="hidden" id="ai-confidence-score-input">
+                <input type="hidden" id="ai-model-name-input">
+                <input type="hidden" id="ai-suggested-category-input">
+                <input type="hidden" id="ai-temp-filename-input">
               </div>
             </div>
 
             <div style="margin-top: 32px; display: flex; justify-content: flex-end; gap: 14px;">
-              <button type="button" class="btn btn-glass btn-lg" onclick="window.history.back()">Cancel</button>
+              <button type="button" class="btn btn-glass btn-lg" id="btn-lodge-cancel" onclick="window.citizenShieldLodgeCancel &amp;&amp; window.citizenShieldLodgeCancel()">Cancel</button>
               <button type="button" class="btn btn-lagoon btn-lg" id="btn-open-review">Review &amp; Lodge Dossier →</button>
             </div>
           </form>
@@ -577,10 +633,24 @@
                 <div id="dossier-description" style="background: rgba(8, 29, 36, 0.6); padding: 14px; border: 1px solid var(--lagoon-border); border-radius: var(--radius-sm); font-size: 0.95rem; line-height: 1.6; white-space: pre-wrap;"></div>
               </div>
 
-              <!-- Photo -->
+              <!-- Photo & AI Analysis Badge -->
               <div id="dossier-photo-container" class="hidden" style="margin-bottom: 24px;">
-                <div class="dossier-field-label" style="margin-bottom: 6px;">Verified Evidence Photo Attachment:</div>
-                <img id="dossier-photo" src="" alt="Evidence photo" style="max-height: 240px; border-radius: var(--radius-sm); border: 1px solid var(--lagoon-border);">
+                <div class="dossier-field-label" style="margin-bottom: 8px;">Verified Evidence Photo &amp; AI Analysis Record:</div>
+                <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+                  <img id="dossier-photo" src="" alt="Evidence photo" style="max-height: 220px; border-radius: var(--radius-sm); border: 1px solid var(--lagoon-border);">
+                  <div id="dossier-ai-badge-box" class="lagoon-card hidden" style="padding: 12px 16px; min-width: 260px;">
+                    <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--teal-light); font-weight: 700;">AI Vision Verification</div>
+                    <div id="dossier-ai-class" style="font-size: 1.1rem; font-weight: 700; color: #ffffff; margin-top: 4px;">Potholes</div>
+                    <div style="font-size: 0.85rem; color: var(--mint-glow); margin-top: 2px;">Confidence: <span id="dossier-ai-conf">88%</span></div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 4px;">Model: <span id="dossier-ai-model" style="font-family: var(--font-mono);">YOLOv8</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- After Repair Verification Image (if resolved) -->
+              <div id="dossier-after-photo-container" class="hidden" style="margin-bottom: 24px;">
+                <div class="dossier-field-label" style="margin-bottom: 8px; color: var(--mint-glow);">Field Rectification Verification Photo (Post-Repair):</div>
+                <img id="dossier-after-photo" src="" alt="After repair photo" style="max-height: 220px; border-radius: var(--radius-sm); border: 1px solid var(--mint-glow);">
               </div>
 
               <!-- Audit Timeline -->
@@ -611,6 +681,206 @@
         </div>
       </div>
       <div class="gis-map-frame" id="full-city-gis-map" style="height: 600px;"></div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 6.2: LIVE COLOUR-CODED COMPLAINT ZONE MAP -->
+    <!-- ==================================================== -->
+    <section id="view-zone-monitoring" class="app-view hidden">
+      <div class="card-header-flex">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h2 class="card-title">Live Complaint Zone Monitoring</h2>
+            <span class="role-tag" style="background: rgba(22, 163, 74, 0.2); color: #4ade80; border: 1px solid #16a34a;">Real-Time Spatial Density</span>
+          </div>
+          <p class="card-desc">Geographical complaint distribution across 6 demarcated sectors of Tumakuru City Corporation with automated Green, Orange, and Red hazard classification.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <div style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono);">
+            Auto-refresh: <span id="zone-refresh-timer" style="color: var(--teal-light); font-weight: 700;">20s</span> | Last: <span id="zone-last-updated" style="color: #ffffff;">--:--:--</span>
+          </div>
+          <button class="btn btn-lagoon btn-sm" id="btn-manual-refresh-zones">🔄 Refresh Zones Now</button>
+        </div>
+      </div>
+
+      <!-- Zone Classification KPI Stream Bar -->
+      <div class="streams-grid" style="margin-bottom: 24px;">
+        <div class="stream-card">
+          <div class="stream-value" id="kpi-total-zones" style="color: #ffffff;">6</div>
+          <div class="stream-label">Total Monitored Zones</div>
+        </div>
+        <div class="stream-card" style="border-top: 3px solid #16A34A;">
+          <div class="stream-value" id="kpi-green-zones" style="color: #4ade80;">0</div>
+          <div class="stream-label">Green Zones (0 - 3 Active)</div>
+        </div>
+        <div class="stream-card" style="border-top: 3px solid #F97316;">
+          <div class="stream-value" id="kpi-orange-zones" style="color: #fb923c;">0</div>
+          <div class="stream-label">Orange Zones (4 - 7 Active)</div>
+        </div>
+        <div class="stream-card" style="border-top: 3px solid #DC2626;">
+          <div class="stream-value" id="kpi-red-zones" style="color: #f87171;">0</div>
+          <div class="stream-label">Red Zones (8+ High Risk)</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="kpi-active-complaints" style="color: var(--amber-alert);">0</div>
+          <div class="stream-label">Total Active Complaints</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="kpi-resolved-complaints" style="color: var(--mint-glow);">0</div>
+          <div class="stream-label">Resolved Complaints</div>
+        </div>
+      </div>
+
+      <!-- Color Legend Bar -->
+      <div class="lagoon-card" style="padding: 12px 20px; margin-bottom: 18px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap; font-size: 0.85rem;">
+          <span style="font-weight: 700; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">Zone Classification Legend:</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 14px; height: 14px; background: #16A34A; border-radius: 3px; box-shadow: 0 0 8px #16A34A;"></span>
+            <strong>Green Zone</strong> (0 to 3 Complaints) — <span style="color: #86efac;">Low Complaint Area</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 14px; height: 14px; background: #F97316; border-radius: 3px; box-shadow: 0 0 8px #F97316;"></span>
+            <strong>Orange Zone</strong> (4 to 7 Complaints) — <span style="color: #fdba74;">Medium Complaint Area</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-block; width: 14px; height: 14px; background: #DC2626; border-radius: 3px; box-shadow: 0 0 8px #DC2626;"></span>
+            <strong>Red Zone</strong> (8 to 10+ Complaints) — <span style="color: #fca5a5;">High Risk / Emergency Alert</span>
+          </div>
+        </div>
+        <span style="font-size: 0.8rem; color: var(--teal-light);">* Click any zone polygon or marker to view real-time complaint dossier</span>
+      </div>
+
+      <!-- High-Volume Zone Emergency Banner (Dynamically shown if >10 complaints in any zone) -->
+      <div id="zone-high-volume-alert" class="hidden" style="margin-bottom: 18px; padding: 14px 20px; background: rgba(220, 38, 38, 0.18); border: 1px solid #dc2626; border-radius: var(--radius-sm); color: #fecaca;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 1.4rem;">🚨</span>
+          <div>
+            <strong style="color: #ffffff; font-size: 0.95rem;">CRITICAL CIVIC CONGESTION ALERT</strong>
+            <p id="zone-high-volume-msg" style="margin: 4px 0 0 0; font-size: 0.86rem; color: #fca5a5;"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map & Zone Details Split Layout -->
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start;">
+        <!-- Leaflet Live Zone Map -->
+        <div class="lagoon-card" style="padding: 12px; position: relative;">
+          <div id="live-zone-leaflet-map" style="height: 640px; border-radius: var(--radius-sm); z-index: 1;"></div>
+        </div>
+
+        <!-- Selected Zone Dossier Drawer -->
+        <div class="lagoon-card" id="zone-dossier-card" style="padding: 20px; max-height: 664px; overflow-y: auto;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <span id="zone-drawer-badge" class="priority-pill" style="background: #16A34A; color: #ffffff; font-weight: 700;">GREEN ZONE</span>
+              <h3 id="zone-drawer-title" style="margin: 8px 0 4px 0; font-size: 1.2rem; color: #ffffff;">Zone 1 - Central Commercial Core</h3>
+            </div>
+          </div>
+          <p id="zone-drawer-desc" style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">Town Hall, Mandipet, Chickpet, Ashok Nagar, Market Corridor</p>
+
+          <div style="padding: 10px 14px; background: rgba(8, 29, 36, 0.6); border: 1px solid var(--lagoon-border); border-radius: var(--radius-sm); margin-bottom: 16px;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Assigned Department: <strong id="zone-drawer-dept" style="color: var(--teal-light);">Roads &amp; Civil Infrastructure</strong></div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Active Grievance Count: <strong id="zone-drawer-count" style="color: #ffffff; font-size: 1rem;">0 Complaints</strong></div>
+          </div>
+
+          <h4 style="font-size: 0.92rem; font-weight: 700; color: #ffffff; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Active Complaints in this Zone:</h4>
+          <div id="zone-drawer-complaints-list" style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px;">
+              Select any zone boundary on the map to inspect its active complaints.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================== -->
+    <!-- VIEW 6.5: MODULE 3 REAL AI DETECTION DASHBOARD -->
+    <!-- ==================================================== -->
+    <section id="view-ai-dashboard" class="app-view hidden">
+      <div class="card-header-flex">
+        <div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h2 class="card-title">Real AI Computer Vision Analytics</h2>
+            <span class="role-tag" style="background: rgba(56, 189, 248, 0.2); color: var(--teal-light); border: 1px solid var(--teal-light);">Deep Learning Engine</span>
+          </div>
+          <p class="card-desc">Real-time computer vision inference statistics derived directly from persistent SQLite detection records.</p>
+        </div>
+        <button class="btn btn-glass btn-sm" id="btn-refresh-ai-metrics">🔄 Refresh AI Metrics</button>
+      </div>
+
+      <!-- AI Metrics Top KPI Row -->
+      <div class="streams-grid" style="margin-bottom: 24px;">
+        <div class="stream-card">
+          <div class="stream-value" id="ai-metric-total-analyzed" style="color: var(--teal-light);">0</div>
+          <div class="stream-label">Total Images Analysed</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="ai-metric-supported-detected" style="color: var(--mint-glow);">0</div>
+          <div class="stream-label">Supported Civic Detections</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="ai-metric-avg-conf" style="color: #38bdf8;">0%</div>
+          <div class="stream-label">Average Confidence Score</div>
+        </div>
+        <div class="stream-card">
+          <div class="stream-value" id="ai-metric-failures" style="color: #cbd5e1;">0</div>
+          <div class="stream-label">Manual Fallbacks / No Match</div>
+        </div>
+      </div>
+
+      <!-- Category Breakdown Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px;">
+        <div class="lagoon-card" style="padding: 16px 20px; text-align: center;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Potholes Detected</div>
+          <div id="ai-stat-potholes" style="font-size: 2rem; font-weight: 800; color: #f87171; margin-top: 6px;">0</div>
+          <div style="font-size: 0.75rem; color: var(--teal-light); margin-top: 4px;">YOLOv8 Segmentation</div>
+        </div>
+        <div class="lagoon-card" style="padding: 16px 20px; text-align: center;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Garbage Accumulation</div>
+          <div id="ai-stat-garbage" style="font-size: 2rem; font-weight: 800; color: #fbbf24; margin-top: 6px;">0</div>
+          <div style="font-size: 0.75rem; color: var(--teal-light); margin-top: 4px;">YOLOv8 Litter Model</div>
+        </div>
+        <div class="lagoon-card" style="padding: 16px 20px; text-align: center;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Road Damage / Cracks</div>
+          <div id="ai-stat-road-damage" style="font-size: 2rem; font-weight: 800; color: #38bdf8; margin-top: 6px;">0</div>
+          <div style="font-size: 0.75rem; color: var(--teal-light); margin-top: 4px;">YOLOv8 Distress Network</div>
+        </div>
+        <div class="lagoon-card" style="padding: 16px 20px; text-align: center;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Drainage Problems</div>
+          <div id="ai-stat-drainage" style="font-size: 2rem; font-weight: 800; color: #a78bfa; margin-top: 6px;">0</div>
+          <div style="font-size: 0.75rem; color: var(--teal-light); margin-top: 4px;">OpenCV Spectral Analysis</div>
+        </div>
+        <div class="lagoon-card" style="padding: 16px 20px; text-align: center;">
+          <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Water Leakage</div>
+          <div id="ai-stat-water-leakage" style="font-size: 2rem; font-weight: 800; color: #34d399; margin-top: 6px;">0</div>
+          <div style="font-size: 0.75rem; color: var(--teal-light); margin-top: 4px;">OpenCV Surface Sheen</div>
+        </div>
+      </div>
+
+      <!-- Real AI Detections Log Table -->
+      <div class="lagoon-card" style="padding: 20px;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 16px;">Verified AI Inferences Log</h3>
+        <div class="table-wrap">
+          <table class="lagoon-table">
+            <thead>
+              <tr>
+                <th>Detection ID</th>
+                <th>Report Ref</th>
+                <th>Detected Class</th>
+                <th>Model Confidence</th>
+                <th>Vision Model</th>
+                <th>Suggested Category</th>
+                <th>Status</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="ai-detections-table-body">
+              <!-- Dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- ==================================================== -->
@@ -734,6 +1004,7 @@
               <th>Reference ID</th>
               <th>Citizen</th>
               <th>Department</th>
+              <th>Evidence Photo</th>
               <th>Severity</th>
               <th>Summary</th>
               <th>Ward / Location</th>
@@ -759,7 +1030,7 @@
     <div class="modal-dialog">
       <div class="modal-dialog-header">
         <span class="modal-dialog-title">Review Grievance Lodgment Details</span>
-        <button class="modal-dialog-close" data-modal-close="modal-review">&times;</button>
+        <button type="button" class="modal-dialog-close" data-modal-close="modal-review" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-review')">&times;</button>
       </div>
       <div class="modal-dialog-body">
         <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 18px; font-size: 0.88rem; color: #fca5a5;">
@@ -787,13 +1058,28 @@
     <div class="modal-dialog">
       <div class="modal-dialog-header">
         <span class="modal-dialog-title">Issue Administrative Directive &amp; Update Status</span>
-        <button class="modal-dialog-close" data-modal-close="modal-officer-action">&times;</button>
+        <button type="button" class="modal-dialog-close" data-modal-close="modal-officer-action" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-officer-action')">&times;</button>
       </div>
       <div class="modal-dialog-body">
         <input type="hidden" id="officer-update-ref-id">
         <div style="margin-bottom: 18px;">
           <span class="report-token" id="officer-dialog-ref">CS-2026-XXXXX</span>
           <h4 style="margin-top: 8px; font-size: 1.1rem; font-weight: 700; color: #ffffff;" id="officer-dialog-title">Issue Title</h4>
+        </div>
+
+        <!-- Citizen Original Complaint Photograph Evidence Section -->
+        <div id="officer-photo-section" style="margin-bottom: 18px; padding: 14px; background: rgba(5, 19, 24, 0.7); border: 1px solid var(--lagoon-border); border-radius: var(--radius-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.82rem; font-weight: 700; color: var(--teal-light); text-transform: uppercase; letter-spacing: 0.5px;">📸 Citizen Complaint Photo Evidence</span>
+            <button type="button" class="btn btn-glass btn-sm" id="btn-officer-expand-photo" style="font-size: 0.76rem; padding: 3px 8px;">🔍 View Full Image</button>
+          </div>
+          <div id="officer-photo-wrapper" style="text-align: center;">
+            <img id="officer-dialog-photo" src="" alt="Citizen Evidence Photograph" style="max-height: 240px; max-width: 100%; border-radius: 6px; border: 1px solid var(--lagoon-border-bright); cursor: pointer; object-fit: contain;">
+            <div id="officer-photo-placeholder" class="hidden" style="padding: 24px; color: var(--text-muted); font-size: 0.88rem; background: rgba(0,0,0,0.2); border-radius: 6px;">
+              📁 No photograph attached by citizen for this grievance.
+            </div>
+          </div>
+          <div id="officer-ai-detect-tag" style="margin-top: 8px; font-size: 0.8rem; color: #a7f3d0;"></div>
         </div>
 
         <div class="form-group" style="margin-bottom: 16px;">
@@ -818,14 +1104,50 @@
           </select>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="officer-select-priority">Priority / Urgency Level</label>
+          <select id="officer-select-priority" class="form-select">
+            <option value="">Keep Current Priority</option>
+            <option value="Urgent">Urgent Hazard (12h SLA)</option>
+            <option value="High">High Priority (24h SLA)</option>
+            <option value="Normal">Normal (48h SLA)</option>
+            <option value="Low">Low (72h SLA)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
           <label class="form-label" for="officer-text-remarks">Official Administrative Remark / Work Order Note *</label>
           <textarea id="officer-text-remarks" class="form-textarea" placeholder="Detail the field inspection findings, assigned contractor, or resolution justification..." required></textarea>
         </div>
+
+        <!-- Mandatory Post-Repair Photo Upload for Resolved Status -->
+        <div class="form-group hidden" id="officer-after-photo-group" style="margin-top: 14px; padding: 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm);">
+          <label class="form-label" for="officer-after-photo" style="color: var(--mint-glow); font-weight: 700;">📸 After-Repair Evidence Photo * (Mandatory for Resolution)</label>
+          <input type="file" id="officer-after-photo" class="form-input" accept="image/jpeg,image/png,image/webp">
+          <div class="form-hint" style="color: #a7f3d0;">Field rectification photograph must be uploaded before marking complaint as Resolved.</div>
+        </div>
       </div>
       <div class="modal-dialog-footer">
-        <button type="button" class="btn btn-glass" data-modal-close="modal-officer-action">Cancel</button>
+        <button type="button" class="btn btn-glass" data-modal-close="modal-officer-action" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-officer-action')">Cancel</button>
         <button type="button" class="btn btn-lagoon" id="btn-save-officer-directive">Publish Official Directive</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: IMAGE LIGHTBOX ENLARGER FOR OFFICERS & CITIZENS -->
+  <div id="modal-image-lightbox" class="modal-backdrop hidden" role="dialog" aria-modal="true" style="z-index: 3000;">
+    <div class="modal-dialog" style="max-width: 900px; text-align: center; background: rgba(5, 19, 24, 0.95);">
+      <div class="modal-dialog-header">
+        <span class="modal-dialog-title" id="lightbox-title">Original Complaint Photograph Evidence</span>
+        <button type="button" class="modal-dialog-close" data-modal-close="modal-image-lightbox" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-image-lightbox')">&times;</button>
+      </div>
+      <div class="modal-dialog-body" style="padding: 20px;">
+        <img id="lightbox-img" src="" alt="Full Complaint Evidence" style="max-width: 100%; max-height: 75vh; border-radius: 8px; border: 1px solid var(--teal-light); object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.8);">
+        <div id="lightbox-caption" style="margin-top: 14px; color: var(--teal-light); font-size: 0.9rem; font-family: var(--font-mono);"></div>
+      </div>
+      <div class="modal-dialog-footer">
+        <a id="lightbox-download-link" href="#" target="_blank" download class="btn btn-glass btn-sm">⬇️ Download High-Res Original</a>
+        <button type="button" class="btn btn-lagoon btn-sm" data-modal-close="modal-image-lightbox" onclick="window.citizenShieldCloseModal &amp;&amp; window.citizenShieldCloseModal('modal-image-lightbox')">Close Preview</button>
       </div>
     </div>
   </div>
@@ -843,7 +1165,7 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-  <!-- Application Bootstrap -->
-  <script type="module" src="app.js"></script>
+  <!-- Application Bootstrap (Cache-busted) -->
+  <script type="module" src="app.js?v=2.4"></script>
 </body>
 </html>

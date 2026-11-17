@@ -10,7 +10,12 @@ import {
   apiGetAllReports, 
   apiGetMapPins, 
   apiUpdateReportStatus, 
-  apiGetAdminMetrics, 
+  apiGetAdminMetrics,
+  apiAnalyzeImage,
+  apiCheckDuplicate,
+  apiGetAiMetrics,
+  apiGetZonesSummary,
+  apiGetZoneComplaints,
   getCurrentUser, 
   getToken 
 } from './js/api.js';
@@ -29,9 +34,17 @@ let activeUser = null;
 let currentReportLat = 13.3414;
 let currentReportLng = 77.1022;
 let selectedEvidenceFile = null;
+let selectedAfterRepairFile = null;
+let currentAiResult = null;
 let cachedCitizenReports = [];
 let cachedAdminReports = [];
+let cachedZonesData = [];
 let stippleOrbInstance = null;
+let zoneLeafletMap = null;
+let zonePolygonsLayer = null;
+let zoneMarkersLayer = null;
+let zoneRefreshInterval = null;
+let zoneTimerCountdown = 20;
 
 document.addEventListener('DOMContentLoaded', () => {
   initApp();
@@ -50,7 +63,7 @@ async function initApp() {
   // 3. Wire authentication
   setupAuth();
 
-  // 4. Wire grievance lodging & GPS
+  // 4. Wire grievance lodging, AI analysis & GPS
   setupLodgeGrievance();
 
   // 5. Wire case tracking
@@ -59,10 +72,16 @@ async function initApp() {
   // 6. Wire officer console
   setupOfficerConsole();
 
-  // 7. Wire modals
+  // 6.5 Wire live zone monitoring
+  setupZoneMonitoring();
+
+  // 7. Wire AI dashboard
+  setupAiDashboard();
+
+  // 8. Wire modals
   setupModals();
 
-  // 8. Load initial Home radar & statistics
+  // 9. Load initial Home radar & statistics
   loadHomeOverview();
 }
 
@@ -91,6 +110,8 @@ function updateAuthUI(user) {
   const userNameText = document.getElementById('header-user-name');
   const userRolePill = document.getElementById('header-user-role');
   const navOfficer = document.getElementById('nav-officer-console');
+  const navAiDashboard = document.getElementById('nav-ai-dashboard');
+  const navZoneMonitoring = document.getElementById('nav-zone-monitoring');
 
   if (user) {
     badgeContainer.classList.remove('hidden');
@@ -98,55 +119,52 @@ function updateAuthUI(user) {
     userNameText.textContent = user.name || user.email;
 
     if (user.role === 'admin' || user.role === 'officer') {
-      userRolePill.textContent = 'Officer';
-      userRolePill.classList.add('admin');
+      userRolePill.textContent = 'Municipal Officer';
+      userRolePill.className = 'role-tag admin';
       navOfficer.classList.remove('hidden');
+      if (navAiDashboard) navAiDashboard.classList.remove('hidden');
+      if (navZoneMonitoring) navZoneMonitoring.classList.remove('hidden');
     } else {
-      userRolePill.textContent = 'Citizen';
-      userRolePill.classList.remove('admin');
+      userRolePill.textContent = 'Registered Citizen';
+      userRolePill.className = 'role-tag citizen';
       navOfficer.classList.add('hidden');
+      if (navAiDashboard) navAiDashboard.classList.add('hidden');
+      if (navZoneMonitoring) navZoneMonitoring.classList.add('hidden');
     }
   } else {
     badgeContainer.classList.add('hidden');
     btnHeaderLogin.classList.remove('hidden');
     navOfficer.classList.add('hidden');
+    if (navAiDashboard) navAiDashboard.classList.add('hidden');
+    if (navZoneMonitoring) navZoneMonitoring.classList.add('hidden');
   }
 }
 
 /**
- * Navigation & View Router
+ * Navigation Router
  */
 function setupNavigation() {
-  document.querySelectorAll('[data-view-target]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      const target = el.getAttribute('data-view-target');
-      navigate(target);
-    });
+  document.body.addEventListener('click', (e) => {
+    const targetBtn = e.target.closest('[data-view-target]');
+    if (targetBtn) {
+      const viewId = targetBtn.getAttribute('data-view-target');
+      navigate(viewId);
+    }
   });
 
-  // Global Logout Button
   document.getElementById('btn-global-logout').addEventListener('click', async () => {
     await apiLogout();
     activeUser = null;
     updateAuthUI(null);
-    showToast("You have been signed out of CitizenShield.", "info");
+    showToast("Logged out successfully.", "info");
     navigate('view-home');
   });
-
-  // Expose global track function for Leaflet Popups
-  window.trackReportFromMap = (reportId) => {
-    navigate('view-tracking');
-    document.getElementById('track-search-input').value = reportId;
-    performTrackSearch(reportId);
-  };
 }
 
 function navigate(viewId) {
-  // Route Guards
-  if (viewId === 'view-submit' || viewId === 'view-citizen-dashboard') {
+  if (viewId === 'view-citizen-dashboard' || viewId === 'view-submit') {
     if (!activeUser) {
-      showToast("Authentication required. Please sign in or register as a citizen.", "warning");
+      showToast("Authentication Required: Please sign in or register to lodge/view dossiers.", "warning");
       showView('view-auth');
       return;
     }
@@ -158,6 +176,22 @@ function navigate(viewId) {
       return;
     }
     loadOfficerConsole();
+  }
+
+  if (viewId === 'view-ai-dashboard') {
+    if (!activeUser || (activeUser.role !== 'admin' && activeUser.role !== 'officer')) {
+      showToast("Access Restricted: Municipal Officer credentials required for AI metrics.", "error");
+      return;
+    }
+    loadAiDashboard();
+  }
+
+  if (viewId === 'view-zone-monitoring') {
+    if (!activeUser || (activeUser.role !== 'admin' && activeUser.role !== 'officer')) {
+      showToast("Access Restricted: Municipal Officer credentials required for Zone Monitoring.", "error");
+      return;
+    }
+    loadLiveZoneMonitoring();
   }
 
   if (viewId === 'view-home') {
@@ -181,6 +215,7 @@ function navigate(viewId) {
         document.getElementById('report-lng').value = lng.toFixed(6);
         document.getElementById('coords-readout').textContent = 
           `Selected Coordinates: Lat ${lat.toFixed(6)}, Lng ${lng.toFixed(6)}`;
+        triggerDuplicateCheck();
       });
     }, 150);
   }
@@ -197,7 +232,6 @@ function showView(viewId) {
     }
   });
 
-  // Update navbar active classes
   document.querySelectorAll('.nav-menu-btn, .gov-nav-link').forEach(link => {
     if (link.getAttribute('data-view-target') === viewId) {
       link.classList.add('active');
@@ -216,7 +250,6 @@ async function loadHomeOverview() {
   try {
     const pins = await apiGetMapPins();
     
-    // Update Stats if elements exist
     const elTotal = document.getElementById('home-stat-total');
     if (elTotal) elTotal.textContent = pins.length;
     const elInsp = document.getElementById('home-stat-inspection');
@@ -229,7 +262,6 @@ async function loadHomeOverview() {
     if (elRes) elRes.textContent = 
       pins.filter(p => p.status === 'Resolved').length;
 
-    // Initialize Home mini radar map
     setTimeout(() => {
       initCityMap('home-gis-map', pins);
     }, 150);
@@ -249,10 +281,8 @@ function setupAuth() {
 
   tabLogin.addEventListener('click', () => {
     tabLogin.style.borderBottom = '2px solid var(--teal-light)';
-    tabLogin.style.fontWeight = '700';
     tabLogin.style.color = 'var(--teal-light)';
     tabRegister.style.borderBottom = 'none';
-    tabRegister.style.fontWeight = '600';
     tabRegister.style.color = 'var(--text-dim)';
     formLogin.classList.remove('hidden');
     formRegister.classList.add('hidden');
@@ -260,43 +290,32 @@ function setupAuth() {
 
   tabRegister.addEventListener('click', () => {
     tabRegister.style.borderBottom = '2px solid var(--teal-light)';
-    tabRegister.style.fontWeight = '700';
     tabRegister.style.color = 'var(--teal-light)';
     tabLogin.style.borderBottom = 'none';
-    tabLogin.style.fontWeight = '600';
     tabLogin.style.color = 'var(--text-dim)';
     formRegister.classList.remove('hidden');
     formLogin.classList.add('hidden');
   });
 
-  // Password toggle
-  const pwdBtn = document.getElementById('btn-toggle-login-pwd');
-  const pwdInput = document.getElementById('login-password');
-  pwdBtn.addEventListener('click', () => {
-    if (pwdInput.type === 'password') {
-      pwdInput.type = 'text';
-      pwdBtn.textContent = '🔒';
-    } else {
-      pwdInput.type = 'password';
-      pwdBtn.textContent = '👁️';
-    }
+  document.getElementById('btn-toggle-login-pwd').addEventListener('click', () => {
+    const pwdInput = document.getElementById('login-password');
+    pwdInput.type = pwdInput.type === 'password' ? 'text' : 'password';
   });
 
-  // Login Submit
+  // Login Handler
   formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
-    const pass = document.getElementById('login-password').value;
+    const password = document.getElementById('login-password').value;
     const btn = document.getElementById('btn-login-submit');
 
     try {
       btn.disabled = true;
-      btn.textContent = 'Authenticating with Backend...';
-      const data = await apiLogin(email, pass);
-      activeUser = data.user;
+      btn.textContent = 'Verifying Credentials...';
+      const res = await apiLogin(email, password);
+      activeUser = res.user;
       updateAuthUI(activeUser);
-      showToast(`Welcome back, ${activeUser.name}!`, "success");
-      formLogin.reset();
+      showToast(`Welcome back, ${activeUser.name || activeUser.email}!`, "success");
 
       if (activeUser.role === 'admin' || activeUser.role === 'officer') {
         navigate('view-admin-dashboard');
@@ -311,23 +330,24 @@ function setupAuth() {
     }
   });
 
-  // Register Submit
+  // Register Handler
   formRegister.addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('reg-name').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const phone = document.getElementById('reg-phone').value.trim();
-    const pass = document.getElementById('reg-password').value;
+    const password = document.getElementById('reg-password').value;
     const btn = document.getElementById('btn-reg-submit');
 
     try {
       btn.disabled = true;
-      btn.textContent = 'Registering in Municipal Vault...';
-      const data = await apiRegister(name, email, pass, phone);
-      activeUser = data.user;
+      btn.textContent = 'Creating Citizen Account...';
+      await apiRegister(name, email, password, phone);
+      showToast("Account created successfully! Signing you in...", "success");
+
+      const res = await apiLogin(email, password);
+      activeUser = res.user;
       updateAuthUI(activeUser);
-      showToast("Account successfully registered! Welcome to CitizenShield.", "success");
-      formRegister.reset();
       navigate('view-citizen-dashboard');
     } catch (err) {
       showToast(err.message, "error");
@@ -337,22 +357,24 @@ function setupAuth() {
     }
   });
 
-  // Viva demo credential fillers
+  // Demo Credentials Autocomplete
   document.getElementById('btn-demo-citizen').addEventListener('click', () => {
+    tabLogin.click();
     document.getElementById('login-email').value = 'rahul.citizen@gmail.com';
     document.getElementById('login-password').value = 'Citizen@2026';
     showToast("Filled demo Citizen credentials. Click 'Authenticate & Proceed'.", "info");
   });
 
   document.getElementById('btn-demo-admin').addEventListener('click', () => {
-    document.getElementById('login-email').value = 'admin@citizenshield.gov';
-    document.getElementById('login-password').value = 'Admin@2026';
+    tabLogin.click();
+    document.getElementById('login-email').value = 'engineer@citizenshield.gov';
+    document.getElementById('login-password').value = 'Engineer@2026';
     showToast("Filled Directorate Admin credentials. Click 'Authenticate & Proceed'.", "info");
   });
 }
 
 /**
- * Grievance Lodging & Geolocation
+ * Grievance Lodging, Real AI Vision Analysis & Geolocation
  */
 function setupLodgeGrievance() {
   const btnDetectGps = document.getElementById('btn-detect-gps');
@@ -360,6 +382,8 @@ function setupLodgeGrievance() {
   const fileInput = document.getElementById('lodge-image');
   const previewBox = document.getElementById('lodge-img-preview-box');
   const previewImg = document.getElementById('lodge-img-preview');
+  const aiProgress = document.getElementById('ai-scanning-progress');
+  const aiResultCard = document.getElementById('ai-scan-result-card');
 
   // GPS Detection with Reverse Geocoding
   btnDetectGps.addEventListener('click', () => {
@@ -384,7 +408,6 @@ function setupLodgeGrievance() {
 
         setReportMapPin(latitude, longitude, 17);
 
-        // Reverse geocoding via OpenStreetMap
         try {
           const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
           if (res.ok) {
@@ -400,6 +423,7 @@ function setupLodgeGrievance() {
         btnDetectGps.disabled = false;
         btnDetectGps.textContent = "📍 Detect GPS";
         showToast("GPS coordinates acquired with user consent.", "success");
+        triggerDuplicateCheck();
       },
       (err) => {
         btnDetectGps.disabled = false;
@@ -410,29 +434,129 @@ function setupLodgeGrievance() {
     );
   });
 
-  // Image Preview
-  fileInput.addEventListener('change', (e) => {
+  // Image Upload + Real AI Vision Inference
+  fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        showToast("Image exceeds 10 MB limit. Please select a smaller photo.", "error");
-        fileInput.value = '';
-        previewBox.classList.add('hidden');
-        selectedEvidenceFile = null;
-        return;
-      }
-      selectedEvidenceFile = file;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        previewImg.src = ev.target.result;
-        previewBox.classList.remove('hidden');
-      };
-      reader.readAsDataURL(file);
-    } else {
+    if (!file) {
       selectedEvidenceFile = null;
+      currentAiResult = null;
       previewBox.classList.add('hidden');
+      aiResultCard.classList.add('hidden');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast("Image exceeds 15 MB limit. Please select a smaller photo.", "error");
+      fileInput.value = '';
+      previewBox.classList.add('hidden');
+      aiResultCard.classList.add('hidden');
+      selectedEvidenceFile = null;
+      return;
+    }
+
+    selectedEvidenceFile = file;
+
+    // Show local preview
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      previewImg.src = ev.target.result;
+      previewBox.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+
+    // Trigger Real Computer Vision Model Inference
+    aiProgress.classList.remove('hidden');
+    aiResultCard.classList.add('hidden');
+
+    try {
+      const aiData = await apiAnalyzeImage(file);
+      currentAiResult = aiData;
+      aiProgress.classList.add('hidden');
+
+      if (aiData.detected) {
+        aiResultCard.classList.remove('hidden');
+        document.getElementById('ai-detected-title').textContent = `${aiData.detected_class} Detected`;
+        document.getElementById('ai-confidence-badge').textContent = aiData.confidence_percent || `${Math.round(aiData.confidence_score * 100)}%`;
+        document.getElementById('ai-model-name').textContent = aiData.model_name;
+        document.getElementById('ai-suggested-cat').textContent = aiData.suggested_category;
+        document.getElementById('ai-suggested-prio').textContent = aiData.suggested_priority;
+
+        // Auto-select suggested category and priority in form
+        const selectCat = document.getElementById('lodge-category');
+        if (aiData.suggested_category) {
+          for (let i = 0; i < selectCat.options.length; i++) {
+            if (selectCat.options[i].value === aiData.suggested_category) {
+              selectCat.selectedIndex = i;
+              selectCat.dispatchEvent(new Event('change'));
+              break;
+            }
+          }
+        }
+
+        const selectPrio = document.getElementById('lodge-priority');
+        if (aiData.suggested_priority) {
+          selectPrio.value = aiData.suggested_priority;
+        }
+
+        // Store hidden fields
+        document.getElementById('ai-detected-class-input').value = aiData.detected_class;
+        document.getElementById('ai-confidence-score-input').value = aiData.confidence_score;
+        document.getElementById('ai-model-name-input').value = aiData.model_name;
+        document.getElementById('ai-suggested-category-input').value = aiData.suggested_category;
+        document.getElementById('ai-temp-filename-input').value = aiData.temp_image_filename || '';
+
+        showToast(`AI Vision Analysis: ${aiData.detected_class} (${aiData.confidence_percent} confidence)`, "success");
+        triggerDuplicateCheck();
+      } else {
+        aiResultCard.classList.add('hidden');
+        showToast(aiData.message || "No supported civic problem detected. Please select category manually.", "info", 6000);
+      }
+    } catch (err) {
+      aiProgress.classList.add('hidden');
+      console.warn("AI analysis network issue:", err.message);
+      showToast("AI vision service busy. You may continue with manual category selection.", "warning");
     }
   });
+
+  // Citizen confirms AI Category Button
+  document.getElementById('btn-ai-confirm-cat').addEventListener('click', () => {
+    showToast("AI suggested category confirmed for submission.", "success");
+  });
+
+  // Department auto-sync on category change
+  const catSelect = document.getElementById('lodge-category');
+  const deptSelect = document.getElementById('lodge-dept');
+  catSelect.addEventListener('change', () => {
+    const val = catSelect.value;
+    if (val === 'Roads and Transport') deptSelect.value = 'Roads & Civil Infrastructure';
+    else if (val === 'Streetlights and Electricity') deptSelect.value = 'Electrical & Public Lighting';
+    else if (val === 'Water and Drainage') deptSelect.value = 'Water Supply & Sewerage Board';
+    else if (val === 'Garbage and Sanitation') deptSelect.value = 'Solid Waste Management Cell';
+    triggerDuplicateCheck();
+  });
+
+  // Cancel Button in Lodge Form -> Clean reset and navigate to Home
+  window.citizenShieldLodgeCancel = () => {
+    document.getElementById('form-lodge-grievance').reset();
+    const pBox = document.getElementById('lodge-img-preview-box');
+    if (pBox) pBox.classList.add('hidden');
+    const aiBox = document.getElementById('ai-scan-result-card');
+    if (aiBox) aiBox.classList.add('hidden');
+    const dupBox = document.getElementById('duplicate-warning-banner');
+    if (dupBox) dupBox.classList.add('hidden');
+    selectedEvidenceFile = null;
+    currentAiResult = null;
+    navigate('view-home');
+    showToast("Grievance lodgment cancelled.", "info");
+  };
+
+  const btnLodgeCancel = document.getElementById('btn-lodge-cancel');
+  if (btnLodgeCancel) {
+    btnLodgeCancel.addEventListener('click', (e) => {
+      e.preventDefault();
+      window.citizenShieldLodgeCancel();
+    });
+  }
 
   // Review Modal Opener
   document.getElementById('btn-open-review').addEventListener('click', () => {
@@ -444,8 +568,8 @@ function setupLodgeGrievance() {
     const desc = document.getElementById('lodge-description').value.trim();
     const loc = inputLoc.value.trim();
 
-    if (!title || !desc || !loc) {
-      showToast("Please complete all mandatory fields before reviewing.", "error");
+    if (!title || !desc || !loc || !ward || !cat) {
+      showToast("Please complete all mandatory fields (Title, Category, Ward, Address, Description) before reviewing.", "error");
       return;
     }
 
@@ -460,7 +584,7 @@ function setupLodgeGrievance() {
     openModal('modal-review');
   });
 
-  // Final Submission to Persistent Database
+  // Final Submission to Persistent SQLite Vault
   document.getElementById('btn-final-lodge-submit').addEventListener('click', async () => {
     const btn = document.getElementById('btn-final-lodge-submit');
     
@@ -475,6 +599,17 @@ function setupLodgeGrievance() {
     formData.append('latitude', currentReportLat);
     formData.append('longitude', currentReportLng);
 
+    // Attach AI detection fields if available
+    if (currentAiResult && currentAiResult.detected) {
+      formData.append('ai_detected_class', currentAiResult.detected_class);
+      formData.append('ai_confidence_score', currentAiResult.confidence_score);
+      formData.append('ai_model_name', currentAiResult.model_name);
+      formData.append('ai_suggested_category', currentAiResult.suggested_category);
+      if (currentAiResult.temp_image_filename) {
+        formData.append('temp_image_filename', currentAiResult.temp_image_filename);
+      }
+    }
+
     if (selectedEvidenceFile) {
       formData.append('image', selectedEvidenceFile);
     }
@@ -486,14 +621,16 @@ function setupLodgeGrievance() {
       const res = await apiSubmitReport(formData);
 
       closeModal('modal-review');
-      showToast(`Grievance permanently recorded! Official Reference: ${res.report_id}`, "success", 7000);
+      showToast(`Grievance permanently recorded! Tracking ID: ${res.report_id}`, "success", 7000);
 
       // Reset form
       document.getElementById('form-lodge-grievance').reset();
       previewBox.classList.add('hidden');
+      aiResultCard.classList.add('hidden');
+      document.getElementById('duplicate-warning-banner').classList.add('hidden');
       selectedEvidenceFile = null;
+      currentAiResult = null;
 
-      // Navigate to Citizen Dossier
       navigate('view-citizen-dashboard');
     } catch (err) {
       showToast(err.message, "error");
@@ -502,6 +639,36 @@ function setupLodgeGrievance() {
       btn.textContent = 'Confirm & Lodge into Database';
     }
   });
+}
+
+/**
+ * Module 7: Duplicate Complaint Checking Logic
+ */
+async function triggerDuplicateCheck() {
+  const cat = document.getElementById('lodge-category').value;
+  const warningBanner = document.getElementById('duplicate-warning-banner');
+  const warningText = document.getElementById('duplicate-warning-text');
+  const nearbyList = document.getElementById('duplicate-nearby-list');
+
+  if (!cat || !currentReportLat || !currentReportLng) {
+    warningBanner.classList.add('hidden');
+    return;
+  }
+
+  try {
+    const res = await apiCheckDuplicate(cat, currentReportLat, currentReportLng);
+    if (res.is_duplicate && res.nearby_reports.length > 0) {
+      warningBanner.classList.remove('hidden');
+      warningText.textContent = res.warning_message;
+      nearbyList.innerHTML = res.nearby_reports.map(r => `
+        <div style="margin-top: 4px;">• <strong>${escapeHtml(r.tracking_id)}</strong> (${escapeHtml(r.title)}) — ${escapeHtml(r.status)} [~${r.distance_meters}m away]</div>
+      `).join('');
+    } else {
+      warningBanner.classList.add('hidden');
+    }
+  } catch (err) {
+    console.debug("Duplicate check notice:", err);
+  }
 }
 
 /**
@@ -515,7 +682,6 @@ async function loadCitizenDossiers() {
     const reports = await apiGetMyReports();
     cachedCitizenReports = reports;
 
-    // Metrics
     document.getElementById('cit-metric-total').textContent = reports.length;
     document.getElementById('cit-metric-submitted').textContent = 
       reports.filter(r => r.status === 'Submitted').length;
@@ -529,7 +695,6 @@ async function loadCitizenDossiers() {
     container.innerHTML = `<div style="text-align: center; padding: 32px; color: var(--status-urgent);">Failed to retrieve records: ${err.message}</div>`;
   }
 
-  // Filter handlers
   const filterStatus = document.getElementById('cit-filter-status');
   const filterDept = document.getElementById('cit-filter-dept');
 
@@ -556,9 +721,9 @@ function renderCitizenList(reports) {
     container.innerHTML = `
       <div class="gov-card" style="text-align: center; padding: 48px;">
         <div style="font-size: 2.2rem; margin-bottom: 8px;">📂</div>
-        <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--gov-navy); margin-bottom: 6px;">No Grievance Records Found</h3>
-        <p style="color: var(--text-tertiary); font-size: 0.9rem; margin-bottom: 16px;">There are currently no active complaints matching your filter.</p>
-        <button class="btn btn-amber" onclick="navigate('view-submit')">+ Lodge a Grievance</button>
+        <h3 style="font-size: 1.15rem; font-weight: 800; color: #ffffff; margin-bottom: 6px;">No Grievance Records Found</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">There are currently no active complaints matching your filter.</p>
+        <button class="btn btn-lagoon btn-sm" data-view-target="view-submit">+ Lodge a Grievance Now</button>
       </div>
     `;
     return;
@@ -566,89 +731,132 @@ function renderCitizenList(reports) {
 
   reports.forEach(r => {
     const card = document.createElement('div');
-    card.className = 'gov-card';
-    card.style.padding = '20px';
-    card.style.marginBottom = '16px';
+    card.className = 'lagoon-card';
+    card.style.padding = '20px 24px';
 
-    const statusPillHtml = getStatusPill(r.status);
-    const priorityPillHtml = getPriorityPill(r.priority);
-
-    let remarkSnippet = '';
-    if (r.admin_remarks) {
-      remarkSnippet = `
-        <div style="margin-top: 12px; background: var(--surface-muted); padding: 10px 14px; border-left: 3px solid var(--gov-blue); font-size: 0.88rem;">
-          <strong style="color: var(--gov-navy);">Latest Official Directive:</strong> ${escapeHtml(r.admin_remarks)}
-        </div>
-      `;
-    }
+    const aiBadge = r.detected_class ? `
+      <span style="font-size: 0.76rem; background: rgba(56, 189, 248, 0.15); color: var(--teal-light); padding: 2px 8px; border-radius: var(--radius-full); border: 1px solid rgba(56, 189, 248, 0.3);">
+        AI Detected: ${escapeHtml(r.detected_class)} (${Math.round((r.confidence_score || 0.85) * 100)}%)
+      </span>
+    ` : '';
 
     card.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
         <div>
-          <span class="report-token">${r.report_id}</span>
-          <span class="dept-tag" style="margin-left: 6px;">🏢 ${escapeHtml(r.department)}</span>
-          ${priorityPillHtml}
-          <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--gov-navy); margin-top: 6px;">${escapeHtml(r.title)}</h3>
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap;">
+            <span class="report-token">${r.report_id || r.tracking_id}</span>
+            <span class="dept-tag">${escapeHtml(r.department)}</span>
+            ${getPriorityPill(r.priority)}
+            ${aiBadge}
+          </div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 4px;">${escapeHtml(r.title || r.complaint_title)}</h3>
+          <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 8px;">${escapeHtml(r.description)}</p>
+          <div style="font-size: 0.82rem; color: var(--teal-light);">
+            📍 ${escapeHtml(r.ward)} • ${escapeHtml(r.location)}
+          </div>
         </div>
-        <div>${statusPillHtml}</div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+          ${getStatusPill(r.status)}
+          <button class="btn btn-glass btn-sm" onclick="window.inspectTrackReport('${r.report_id}')">
+            Track Case Timeline →
+          </button>
+        </div>
       </div>
-      <p style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.5;">${escapeHtml(r.description)}</p>
-      ${remarkSnippet}
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-light); font-size: 0.82rem; color: var(--text-tertiary);">
-        <div>📍 ${escapeHtml(r.location)} • 📅 Lodged: ${escapeHtml(r.created_at)}</div>
-        <button class="btn btn-secondary btn-sm" onclick="window.trackReportFromMap('${r.report_id}')">Inspect Case Dossier & Audit Log →</button>
-      </div>
+      ${r.admin_remarks ? `
+        <div style="margin-top: 14px; padding: 10px 14px; background: rgba(8, 29, 36, 0.7); border-left: 3px solid var(--teal-light); border-radius: var(--radius-sm); font-size: 0.86rem; color: #e2e8f0;">
+          <strong>Officer Remarks:</strong> ${escapeHtml(r.admin_remarks)}
+        </div>
+      ` : ''}
     `;
-
     container.appendChild(card);
   });
 }
 
 /**
- * Case Tracker & Certificate Dossier
+ * Case Tracking Dossier View
  */
 function setupTracking() {
-  const form = document.getElementById('form-tracking-search');
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const id = document.getElementById('track-search-input').value.trim();
-    performTrackSearch(id);
+  const btnTrack = document.getElementById('btn-execute-tracking');
+  const inputTrack = document.getElementById('input-track-id');
+
+  btnTrack.addEventListener('click', () => {
+    const id = inputTrack.value.trim();
+    if (!id) {
+      showToast("Please enter a valid Report Reference ID.", "warning");
+      return;
+    }
+    executeTrack(id);
   });
+
+  inputTrack.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnTrack.click();
+    }
+  });
+
+  window.inspectTrackReport = (reportId) => {
+    navigate('view-tracking');
+    document.getElementById('input-track-id').value = reportId;
+    executeTrack(reportId);
+  };
 }
 
-async function performTrackSearch(reportId) {
-  const resultContainer = document.getElementById('tracking-dossier-result');
-  const btn = document.getElementById('btn-search-track');
+async function executeTrack(reportId) {
+  const resultContainer = document.getElementById('tracking-result-dossier');
+  const btn = document.getElementById('btn-execute-tracking');
 
   try {
     btn.disabled = true;
-    btn.textContent = 'Querying Vault...';
+    btn.textContent = 'Verifying Record...';
 
     const r = await apiTrackReport(reportId);
 
-    // Populate Dossier Certificate
-    document.getElementById('dossier-title').textContent = r.title;
-    document.getElementById('dossier-ref-id').textContent = r.report_id;
-    document.getElementById('dossier-status-pill').innerHTML = getStatusPill(r.status);
-    document.getElementById('dossier-priority-pill').innerHTML = getPriorityPill(r.priority);
+    document.getElementById('dossier-ref-code').textContent = r.tracking_id || r.report_id;
+    document.getElementById('dossier-lodged-date').textContent = r.created_at;
+    document.getElementById('dossier-title').textContent = r.title || r.complaint_title;
     document.getElementById('dossier-dept').textContent = r.department;
-    document.getElementById('dossier-ward').textContent = r.ward || 'Central Division';
-    document.getElementById('dossier-created').textContent = r.created_at;
-    document.getElementById('dossier-sla').textContent = `${r.sla_hours || 48} Hours Standard`;
+    document.getElementById('dossier-category').textContent = r.category;
+    document.getElementById('dossier-status-badge').innerHTML = getStatusPill(r.status);
+    document.getElementById('dossier-priority-badge').innerHTML = getPriorityPill(r.priority);
+    document.getElementById('dossier-ward').textContent = r.ward;
     document.getElementById('dossier-location').textContent = r.location;
+    document.getElementById('dossier-sla').textContent = `${r.sla_hours || 48} Hours SLA`;
     document.getElementById('dossier-description').textContent = r.description;
 
-    // Photo
-    const photoBox = document.getElementById('dossier-photo-container');
-    const photoImg = document.getElementById('dossier-photo');
-    if (r.image_filename) {
-      photoImg.src = `/api/uploads/${r.image_filename}`;
-      photoBox.classList.remove('hidden');
+    // AI Badge Box
+    const aiBadgeBox = document.getElementById('dossier-ai-badge-box');
+    if (r.detected_class && r.detected_class !== 'No supported civic problem detected') {
+      aiBadgeBox.classList.remove('hidden');
+      document.getElementById('dossier-ai-class').textContent = r.detected_class;
+      document.getElementById('dossier-ai-conf').textContent = `${Math.round((r.confidence_score || 0.85) * 100)}%`;
+      document.getElementById('dossier-ai-model').textContent = r.model_name || 'YOLOv8';
     } else {
-      photoBox.classList.add('hidden');
+      aiBadgeBox.classList.add('hidden');
     }
 
-    // Audit History Timeline
+    // Evidence Photo
+    const photoContainer = document.getElementById('dossier-photo-container');
+    const photoImg = document.getElementById('dossier-photo');
+    if (r.image_filename || r.image_path) {
+      const imgFile = r.image_filename || r.image_path;
+      photoImg.src = `/api/uploads/${imgFile}`;
+      photoContainer.classList.remove('hidden');
+    } else {
+      photoContainer.classList.add('hidden');
+    }
+
+    // After Repair Photo (if resolved)
+    const afterContainer = document.getElementById('dossier-after-photo-container');
+    const afterImg = document.getElementById('dossier-after-photo');
+    if (r.after_repair_image) {
+      afterImg.src = `/api/uploads/${r.after_repair_image}`;
+      afterContainer.classList.remove('hidden');
+    } else {
+      afterContainer.classList.add('hidden');
+    }
+
+    // Audit Timeline
     const timeline = document.getElementById('dossier-timeline');
     timeline.innerHTML = '';
 
@@ -659,10 +867,10 @@ async function performTrackSearch(reportId) {
       node.innerHTML = `
         <div class="audit-content">
           <div class="audit-heading">
-            <span class="audit-title">${escapeHtml(step.status)} — ${escapeHtml(step.officer_name || 'System')}</span>
+            <span class="audit-title">${escapeHtml(step.new_status || step.status)} — ${escapeHtml(step.officer_name || step.updated_by || 'Municipal Authority')}</span>
             <span class="audit-time">${escapeHtml(step.created_at)}</span>
           </div>
-          <div class="audit-remarks">${escapeHtml(step.remarks)}</div>
+          <div class="audit-remarks">${escapeHtml(step.officer_remarks || step.remarks)}</div>
         </div>
       `;
       timeline.appendChild(node);
@@ -707,7 +915,6 @@ function setupOfficerConsole() {
     loadOfficerConsole();
   });
 
-  // Filter listeners
   const searchInput = document.getElementById('adm-search-input');
   const filterStatus = document.getElementById('adm-filter-status');
   const filterPriority = document.getElementById('adm-filter-priority');
@@ -741,30 +948,67 @@ function setupOfficerConsole() {
     filterWard.addEventListener('change', onFilterChange);
   }
 
+  // Toggle mandatory after-repair photo field on status change
+  const officerStatusSelect = document.getElementById('officer-select-status');
+  const afterPhotoGroup = document.getElementById('officer-after-photo-group');
+  officerStatusSelect.addEventListener('change', () => {
+    if (officerStatusSelect.value === 'Resolved') {
+      afterPhotoGroup.classList.remove('hidden');
+    } else {
+      afterPhotoGroup.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('officer-after-photo').addEventListener('change', (e) => {
+    selectedAfterRepairFile = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+  });
+
   // Status Directive Update Modal Submission
   document.getElementById('btn-save-officer-directive').addEventListener('click', async () => {
-    const reportId = document.getElementById('officer-update-ref-id').value;
+    const reportId = (document.getElementById('officer-update-ref-id').value || '').trim();
     const newStatus = document.getElementById('officer-select-status').value;
     const newDept = document.getElementById('officer-select-dept').value;
+    const newPriority = document.getElementById('officer-select-priority').value;
     const remarks = document.getElementById('officer-text-remarks').value.trim();
     const btn = document.getElementById('btn-save-officer-directive');
+
+    // Retrieve file directly from input element or state variable
+    const afterPhotoInput = document.getElementById('officer-after-photo');
+    const repairPhotoFile = (afterPhotoInput && afterPhotoInput.files && afterPhotoInput.files[0]) ? afterPhotoInput.files[0] : selectedAfterRepairFile;
 
     if (!remarks) {
       showToast("Please provide an official justification and action remark.", "error");
       return;
     }
 
+    if (newStatus === 'Resolved' && !repairPhotoFile) {
+      // Check if complaint already has an after repair image in database
+      const foundReport = cachedAdminReports.find(r => (r.report_id === reportId || r.tracking_id === reportId));
+      if (!foundReport || !foundReport.after_repair_image) {
+        showToast("Mandatory: Please attach an after-repair photo before marking as Resolved.", "error");
+        return;
+      }
+    }
+
     try {
       btn.disabled = true;
       btn.textContent = 'Committing Directive...';
 
-      await apiUpdateReportStatus(reportId, newStatus, remarks, newDept);
+      await apiUpdateReportStatus(reportId, newStatus, remarks, newDept, repairPhotoFile, newPriority);
 
       showToast(`Grievance ${reportId} status updated to ${newStatus}.`, "success");
       closeModal('modal-officer-action');
-      loadOfficerConsole();
+      selectedAfterRepairFile = null;
+      if (afterPhotoInput) afterPhotoInput.value = '';
+      
+      // Refresh Officer Console and Zone Monitoring data seamlessly
+      await loadOfficerConsole();
+      if (typeof loadLiveZoneData === 'function') {
+        loadLiveZoneData();
+      }
     } catch (err) {
-      showToast(err.message, "error");
+      console.error("Directive publish failure:", err);
+      showToast(err.message || "Failed to publish directive.", "error");
     } finally {
       btn.disabled = false;
       btn.textContent = 'Publish Official Directive';
@@ -784,7 +1028,6 @@ async function loadOfficerConsole() {
 
     cachedAdminReports = reports;
 
-    // Display Officer Metrics
     document.getElementById('adm-metric-total').textContent = metrics.total;
     document.getElementById('adm-metric-submitted').textContent = metrics.submitted;
     document.getElementById('adm-metric-review').textContent = metrics.underReview;
@@ -809,16 +1052,34 @@ function renderAdminTable(reports) {
   reports.forEach(r => {
     const tr = document.createElement('tr');
 
+    const aiBadge = r.detected_class && r.detected_class !== 'No supported civic problem detected' ? `
+      <div style="margin-top: 4px; font-size: 0.74rem; color: var(--teal-light);">
+        🧠 <strong>${escapeHtml(r.detected_class)}</strong> (${Math.round((r.confidence_score || 0.85) * 100)}%)
+      </div>
+    ` : '';
+
+    const imgFile = r.image_filename || r.image_path;
+    const photoCell = imgFile ? `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <img src="/api/uploads/${encodeURIComponent(imgFile)}" alt="Evidence" style="width: 44px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid var(--teal-light); cursor: pointer;" onclick="window.openImageLightbox('/api/uploads/${encodeURIComponent(imgFile)}', '${escapeAttr(r.tracking_id || r.report_id)}: ${escapeAttr(r.title || r.complaint_title)}')">
+        <button type="button" class="btn btn-glass btn-sm" style="padding: 2px 6px; font-size: 0.72rem;" onclick="window.openImageLightbox('/api/uploads/${encodeURIComponent(imgFile)}', '${escapeAttr(r.tracking_id || r.report_id)}: ${escapeAttr(r.title || r.complaint_title)}')">View</button>
+      </div>
+    ` : `<span style="color: var(--text-muted); font-size: 0.78rem;">No Photo</span>`;
+
     tr.innerHTML = `
-      <td><span class="report-token">${r.report_id}</span></td>
-      <td><strong>${escapeHtml(r.citizen_name)}</strong><br><span style="font-size: 0.78rem; color: var(--text-tertiary);">${escapeHtml(r.citizen_phone || r.citizen_email)}</span></td>
+      <td><span class="report-token">${r.tracking_id || r.report_id}</span></td>
+      <td><strong>${escapeHtml(r.citizen_name)}</strong><br><span style="font-size: 0.78rem; color: var(--text-muted);">${escapeHtml(r.citizen_phone || r.citizen_email)}</span></td>
       <td><span class="dept-tag">${escapeHtml(r.department)}</span></td>
+      <td>${photoCell}</td>
       <td>${getPriorityPill(r.priority)}</td>
-      <td style="max-width: 220px; font-weight: 600;">${escapeHtml(r.title)}</td>
-      <td style="max-width: 180px; font-size: 0.82rem;">${escapeHtml(r.ward)}<br><span style="color: var(--text-tertiary);">${escapeHtml(r.location)}</span></td>
+      <td style="max-width: 220px; font-weight: 600;">
+        ${escapeHtml(r.title || r.complaint_title)}
+        ${aiBadge}
+      </td>
+      <td style="max-width: 180px; font-size: 0.82rem;">${escapeHtml(r.ward)}<br><span style="color: var(--text-muted);">${escapeHtml(r.location)}</span></td>
       <td>${getStatusPill(r.status)}</td>
       <td>
-        <button class="btn btn-primary btn-sm" onclick="window.openOfficerDirectiveModal('${r.report_id}', '${escapeAttr(r.title)}', '${r.status}', '${r.department}')">
+        <button class="btn btn-lagoon btn-sm" onclick="window.openOfficerDirectiveModal('${r.report_id}', '${escapeAttr(r.title || r.complaint_title)}', '${r.status}', '${r.department}', '${r.priority}')">
           Directive ⚙️
         </button>
       </td>
@@ -827,33 +1088,413 @@ function renderAdminTable(reports) {
   });
 }
 
-// Global modal opener for officer directive
-window.openOfficerDirectiveModal = (reportId, title, currentStatus, currentDept) => {
+// Lightbox preview for full-resolution inspection
+window.openImageLightbox = (imageUrl, caption = '') => {
+  const lbModal = document.getElementById('modal-image-lightbox');
+  const lbImg = document.getElementById('lightbox-img');
+  const lbCaption = document.getElementById('lightbox-caption');
+  const lbDownload = document.getElementById('lightbox-download-link');
+
+  if (lbImg) lbImg.src = imageUrl;
+  if (lbCaption) lbCaption.textContent = caption;
+  if (lbDownload) lbDownload.href = imageUrl;
+
+  openModal('modal-image-lightbox');
+};
+
+window.openOfficerDirectiveModal = (reportId, title, currentStatus, currentDept, currentPriority) => {
   document.getElementById('officer-update-ref-id').value = reportId;
   document.getElementById('officer-dialog-ref').textContent = reportId;
   document.getElementById('officer-dialog-title').textContent = title;
   document.getElementById('officer-select-status').value = currentStatus;
   document.getElementById('officer-select-dept').value = currentDept || '';
+  document.getElementById('officer-select-priority').value = currentPriority || '';
   document.getElementById('officer-text-remarks').value = '';
 
+  // Look up complaint to show image in directive modal
+  const foundReport = cachedAdminReports.find(r => (r.report_id === reportId || r.tracking_id === reportId));
+  const photoImg = document.getElementById('officer-dialog-photo');
+  const photoPlaceholder = document.getElementById('officer-photo-placeholder');
+  const expandBtn = document.getElementById('btn-officer-expand-photo');
+  const aiTag = document.getElementById('officer-ai-detect-tag');
+
+  const photoFile = foundReport ? (foundReport.image_filename || foundReport.image_path) : null;
+  if (photoFile) {
+    const photoUrl = `/api/uploads/${encodeURIComponent(photoFile)}`;
+    photoImg.src = photoUrl;
+    photoImg.classList.remove('hidden');
+    photoPlaceholder.classList.add('hidden');
+    expandBtn.classList.remove('hidden');
+    photoImg.onclick = () => window.openImageLightbox(photoUrl, `${reportId}: ${title}`);
+    expandBtn.onclick = () => window.openImageLightbox(photoUrl, `${reportId}: ${title}`);
+  } else {
+    photoImg.classList.add('hidden');
+    photoPlaceholder.classList.remove('hidden');
+    expandBtn.classList.add('hidden');
+  }
+
+  if (foundReport && foundReport.detected_class && foundReport.detected_class !== 'No supported civic problem detected') {
+    aiTag.innerHTML = `🧠 <strong>Real AI Detection:</strong> ${escapeHtml(foundReport.detected_class)} (Confidence: ${Math.round((foundReport.confidence_score || 0.85)*100)}% via ${escapeHtml(foundReport.model_name || 'YOLOv8')})`;
+  } else {
+    aiTag.innerHTML = '';
+  }
+
+  const afterGroup = document.getElementById('officer-after-photo-group');
+  if (currentStatus === 'Resolved') {
+    afterGroup.classList.remove('hidden');
+  } else {
+    afterGroup.classList.add('hidden');
+  }
+
+  const afterPhotoInput = document.getElementById('officer-after-photo');
+  if (afterPhotoInput) afterPhotoInput.value = '';
+  selectedAfterRepairFile = null;
   openModal('modal-officer-action');
 };
+
+/**
+ * Module 3: AI Detection Dashboard
+ */
+function setupAiDashboard() {
+  const btnRefresh = document.getElementById('btn-refresh-ai-metrics');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      loadAiDashboard();
+    });
+  }
+}
+
+async function loadAiDashboard() {
+  try {
+    const data = await apiGetAiMetrics();
+
+    document.getElementById('ai-metric-total-analyzed').textContent = data.total_analyzed;
+    document.getElementById('ai-metric-supported-detected').textContent = data.total_supported_detections;
+    document.getElementById('ai-metric-avg-conf').textContent = data.avg_confidence_percent;
+    document.getElementById('ai-metric-failures').textContent = data.detection_failures;
+
+    document.getElementById('ai-stat-potholes').textContent = data.potholes_detected;
+    document.getElementById('ai-stat-garbage').textContent = data.garbage_detected;
+    document.getElementById('ai-stat-road-damage').textContent = data.road_damage_detected;
+    document.getElementById('ai-stat-drainage').textContent = data.drainage_detected;
+    document.getElementById('ai-stat-water-leakage').textContent = data.water_leakage_detected;
+
+    const tbody = document.getElementById('ai-detections-table-body');
+    tbody.innerHTML = '';
+
+    if (!data.recent_detections || data.recent_detections.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 24px; color: var(--text-muted);">No AI detection records found.</td></tr>';
+      return;
+    }
+
+    data.recent_detections.forEach(d => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><span style="font-family: var(--font-mono); color: var(--teal-light);">#${d.detection_id}</span></td>
+        <td><span class="report-token">${d.report_id}</span></td>
+        <td><strong>${escapeHtml(d.detected_class)}</strong></td>
+        <td><span style="color: var(--mint-glow); font-weight: 700;">${Math.round(d.confidence_score * 100)}%</span></td>
+        <td><span style="font-family: var(--font-mono); font-size: 0.8rem;">${escapeHtml(d.model_name)}</span></td>
+        <td>${escapeHtml(d.suggested_category)}</td>
+        <td>${d.detection_status === 'SUCCESS' ? '<span class="status-pill status-resolved">● Verified</span>' : '<span class="status-pill status-rejected">● Fallback</span>'}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(d.detected_at)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    showToast("AI Vision Analytics refreshed with live SQLite data.", "info");
+  } catch (err) {
+    showToast(`Error loading AI dashboard: ${err.message}`, "error");
+  }
+}
+
+/**
+ * Module: Live Colour-Coded Zone Monitoring & Spatial Density Map
+ */
+function setupZoneMonitoring() {
+  const btnRefresh = document.getElementById('btn-manual-refresh-zones');
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      fetchAndUpdateZoneData(true);
+    });
+  }
+}
+
+async function loadLiveZoneMonitoring() {
+  initZoneLeafletMap();
+  await fetchAndUpdateZoneData(false);
+
+  // Clear existing timer if any
+  if (zoneRefreshInterval) clearInterval(zoneRefreshInterval);
+  zoneTimerCountdown = 20;
+
+  // Set recurring auto-refresh every 20 seconds
+  zoneRefreshInterval = setInterval(async () => {
+    zoneTimerCountdown--;
+    const timerEl = document.getElementById('zone-refresh-timer');
+    if (timerEl) timerEl.textContent = `${zoneTimerCountdown}s`;
+
+    if (zoneTimerCountdown <= 0) {
+      zoneTimerCountdown = 20;
+      // Only refresh if currently on view-zone-monitoring
+      const viewZone = document.getElementById('view-zone-monitoring');
+      if (viewZone && !viewZone.classList.contains('hidden')) {
+        await fetchAndUpdateZoneData(false);
+      }
+    }
+  }, 1000);
+}
+
+function initZoneLeafletMap() {
+  if (zoneLeafletMap) {
+    zoneLeafletMap.invalidateSize();
+    return;
+  }
+
+  const mapContainer = document.getElementById('live-zone-leaflet-map');
+  if (!mapContainer) return;
+
+  // Centered on Tumakuru Municipal Corporation
+  zoneLeafletMap = L.map('live-zone-leaflet-map', {
+    center: [13.3385, 77.1120],
+    zoom: 13,
+    zoomControl: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> | CitizenShield Spatial Engine',
+    maxZoom: 19
+  }).addTo(zoneLeafletMap);
+
+  zonePolygonsLayer = L.layerGroup().addTo(zoneLeafletMap);
+  zoneMarkersLayer = L.layerGroup().addTo(zoneLeafletMap);
+}
+
+async function fetchAndUpdateZoneData(isManual = false) {
+  try {
+    const data = await apiGetZonesSummary();
+    cachedZonesData = data.zones || [];
+
+    // Update KPI counters
+    document.getElementById('kpi-total-zones').textContent = data.total_zones;
+    document.getElementById('kpi-green-zones').textContent = data.green_zones;
+    document.getElementById('kpi-orange-zones').textContent = data.orange_zones;
+    document.getElementById('kpi-red-zones').textContent = data.red_zones;
+    document.getElementById('kpi-active-complaints').textContent = data.total_active_complaints;
+    document.getElementById('kpi-resolved-complaints').textContent = data.total_resolved_complaints;
+
+    // Last updated timestamp
+    const now = new Date();
+    document.getElementById('zone-last-updated').textContent = now.toLocaleTimeString();
+
+    // High volume emergency alert check (>10 complaints in any single zone)
+    const criticalZone = cachedZonesData.find(z => z.warning);
+    const alertBanner = document.getElementById('zone-high-volume-alert');
+    const alertMsg = document.getElementById('zone-high-volume-msg');
+    if (criticalZone) {
+      alertBanner.classList.remove('hidden');
+      alertMsg.textContent = `${criticalZone.name}: ${criticalZone.warning}`;
+    } else {
+      alertBanner.classList.add('hidden');
+    }
+
+    renderZoneOverlays(cachedZonesData);
+
+    // If first load or no drawer open, select highest density zone
+    if (cachedZonesData.length > 0) {
+      // Sort to find zone with highest active complaints
+      const sorted = [...cachedZonesData].sort((a, b) => b.active_complaints - a.active_complaints);
+      renderZoneDrawer(sorted[0]);
+    }
+
+    if (isManual) {
+      showToast("Zone monitoring map updated with live complaint counts.", "success");
+    }
+  } catch (err) {
+    console.error("Zone fetch error:", err);
+    if (isManual) {
+      showToast(`Zone update failed: ${err.message}`, "error");
+    }
+  }
+}
+
+function renderZoneOverlays(zones) {
+  if (!zoneLeafletMap || !zonePolygonsLayer || !zoneMarkersLayer) return;
+
+  zonePolygonsLayer.clearLayers();
+  zoneMarkersLayer.clearLayers();
+
+  zones.forEach(z => {
+    // Draw geographical boundary rectangle
+    const rect = L.rectangle(z.bounds, {
+      color: z.color,
+      weight: 2.5,
+      opacity: 0.9,
+      fillColor: z.color,
+      fillOpacity: 0.22,
+      dashArray: z.tier === 'RED' ? '6, 6' : null
+    });
+
+    // Tooltip
+    rect.bindTooltip(`
+      <div style="font-family: sans-serif; font-size: 0.82rem; padding: 4px;">
+        <strong style="color: ${z.color};">${z.name}</strong><br>
+        <strong>${z.active_complaints} Active Complaints</strong> (${z.label})
+      </div>
+    `, { sticky: true, opacity: 0.95 });
+
+    // Click handler -> Open Drawer
+    rect.on('click', () => {
+      renderZoneDrawer(z);
+      zoneLeafletMap.panTo(z.center);
+    });
+
+    rect.addTo(zonePolygonsLayer);
+
+    // Add Center Zone Label Badge Marker
+    const badgeIcon = L.divIcon({
+      className: 'zone-badge-label',
+      html: `
+        <div style="background: rgba(5, 19, 24, 0.9); border: 2px solid ${z.color}; color: #ffffff; padding: 4px 10px; border-radius: 20px; font-size: 0.76rem; font-weight: 800; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 6px; cursor: pointer;">
+          <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${z.color};"></span>
+          <span>${z.name.split(' - ')[0]}: <strong>${z.active_complaints}</strong></span>
+        </div>
+      `,
+      iconSize: [120, 30],
+      iconAnchor: [60, 15]
+    });
+
+    const centerMarker = L.marker(z.center, { icon: badgeIcon });
+    centerMarker.on('click', () => {
+      renderZoneDrawer(z);
+    });
+    centerMarker.addTo(zonePolygonsLayer);
+
+    // Plot Individual Complaint Location Markers within this Zone
+    (z.complaints || []).forEach(c => {
+      if (c.latitude && c.longitude) {
+        const markerColor = z.color;
+        const cMarker = L.circleMarker([c.latitude, c.longitude], {
+          radius: 7,
+          fillColor: markerColor,
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.85
+        });
+
+        cMarker.bindPopup(`
+          <div style="font-family: sans-serif; font-size: 0.84rem; min-width: 220px;">
+            <div style="font-size: 0.72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">${escapeHtml(z.name)}</div>
+            <strong style="color: #0284c7; font-size: 0.9rem;">${escapeHtml(c.tracking_id || c.report_id)}</strong>
+            <div style="font-weight: 700; margin: 4px 0 2px 0;">${escapeHtml(c.title || c.complaint_title)}</div>
+            <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 6px;">📍 ${escapeHtml(c.location)}</div>
+            <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+              <span style="font-size: 0.72rem; padding: 2px 6px; background: #e0f2fe; color: #0369a1; border-radius: 4px;">${escapeHtml(c.category)}</span>
+              <span style="font-size: 0.72rem; padding: 2px 6px; background: #fef3c7; color: #92400e; border-radius: 4px;">${escapeHtml(c.priority)}</span>
+            </div>
+            ${c.image_filename ? `
+              <div style="text-align: center; margin-bottom: 8px;">
+                <img src="/api/uploads/${encodeURIComponent(c.image_filename)}" alt="Complaint Photo" style="max-height: 100px; max-width: 100%; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer;" onclick="window.openImageLightbox('/api/uploads/${encodeURIComponent(c.image_filename)}', '${escapeAttr(c.tracking_id)}: ${escapeAttr(c.title)}')">
+              </div>
+            ` : ''}
+            <button class="btn btn-lagoon btn-sm" style="width: 100%; font-size: 0.75rem; padding: 4px 8px;" onclick="window.openOfficerDirectiveModal('${c.report_id}', '${escapeAttr(c.title || c.complaint_title)}', '${c.status}', '${c.department}', '${c.priority}')">
+              Directive &amp; Status ⚙️
+            </button>
+          </div>
+        `);
+
+        cMarker.addTo(zoneMarkersLayer);
+      }
+    });
+  });
+}
+
+function renderZoneDrawer(zone) {
+  const badge = document.getElementById('zone-drawer-badge');
+  const title = document.getElementById('zone-drawer-title');
+  const desc = document.getElementById('zone-drawer-desc');
+  const dept = document.getElementById('zone-drawer-dept');
+  const count = document.getElementById('zone-drawer-count');
+  const list = document.getElementById('zone-drawer-complaints-list');
+
+  if (!zone) return;
+
+  badge.style.background = zone.color;
+  badge.textContent = `${zone.tier} ZONE (${zone.active_complaints} ACTIVE)`;
+  title.textContent = zone.name;
+  desc.textContent = zone.description;
+  dept.textContent = zone.assigned_department;
+  count.textContent = `${zone.active_complaints} Active ${zone.active_complaints === 1 ? 'Complaint' : 'Complaints'}`;
+
+  list.innerHTML = '';
+
+  if (!zone.complaints || zone.complaints.length === 0) {
+    list.innerHTML = `
+      <div style="color: var(--mint-glow); font-size: 0.88rem; text-align: center; padding: 24px; background: rgba(16, 185, 129, 0.08); border-radius: var(--radius-sm); border: 1px solid rgba(16, 185, 129, 0.2);">
+        ✓ No active grievances in this zone. Municipal standards compliant.
+      </div>
+    `;
+    return;
+  }
+
+  zone.complaints.forEach(c => {
+    const card = document.createElement('div');
+    card.style.cssText = 'padding: 12px 14px; background: rgba(8, 29, 36, 0.75); border: 1px solid var(--lagoon-border); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;';
+
+    const imgFile = c.image_filename || c.image_path;
+    const photoThumb = imgFile ? `
+      <div style="margin-top: 6px; display: flex; align-items: center; gap: 10px;">
+        <img src="/api/uploads/${encodeURIComponent(imgFile)}" alt="Complaint Photo" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid var(--teal-light); cursor: pointer;" onclick="window.openImageLightbox('/api/uploads/${encodeURIComponent(imgFile)}', '${escapeAttr(c.tracking_id || c.report_id)}: ${escapeAttr(c.title)}')">
+        <button type="button" class="btn btn-glass btn-sm" style="font-size: 0.72rem; padding: 3px 8px;" onclick="window.openImageLightbox('/api/uploads/${encodeURIComponent(imgFile)}', '${escapeAttr(c.tracking_id || c.report_id)}: ${escapeAttr(c.title)}')">
+          🔍 View Photo
+        </button>
+      </div>
+    ` : `<span style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;">No image attached</span>`;
+
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="report-token" style="font-size: 0.78rem;">${escapeHtml(c.tracking_id || c.report_id)}</span>
+        <span class="status-pill status-${(c.status || '').toLowerCase().replace(' ', '-')}">${escapeHtml(c.status)}</span>
+      </div>
+      <div style="font-weight: 700; color: #ffffff; font-size: 0.9rem;">${escapeHtml(c.title || c.complaint_title)}</div>
+      <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">${escapeHtml(c.description)}</div>
+      <div style="font-size: 0.78rem; color: var(--teal-light);">
+        📍 ${escapeHtml(c.location)} (${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)})
+      </div>
+      <div style="font-size: 0.76rem; color: var(--text-muted);">
+        Category: <strong>${escapeHtml(c.category)}</strong> • Priority: <strong>${escapeHtml(c.priority)}</strong>
+      </div>
+      ${photoThumb}
+      <div style="margin-top: 6px; display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn btn-lagoon btn-sm" style="font-size: 0.75rem; padding: 4px 10px;" onclick="window.openOfficerDirectiveModal('${c.report_id}', '${escapeAttr(c.title || c.complaint_title)}', '${c.status}', '${c.department}', '${c.priority}')">
+          Directive ⚙️
+        </button>
+      </div>
+    `;
+
+    list.appendChild(card);
+  });
+}
 
 /**
  * Modals and Toast Infrastructure
  */
 function setupModals() {
-  document.querySelectorAll('[data-modal-close]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-modal-close');
+  // Global delegated click listener for modal close elements
+  document.addEventListener('click', (e) => {
+    const closeBtn = e.target.closest('[data-modal-close]');
+    if (closeBtn) {
+      e.preventDefault();
+      const id = closeBtn.getAttribute('data-modal-close');
       closeModal(id);
-    });
-  });
+      return;
+    }
 
-  document.querySelectorAll('.modal-backdrop').forEach(modal => {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) closeModal(modal.id);
-    });
+    // Backdrop click to dismiss
+    if (e.target.classList.contains('modal-backdrop')) {
+      closeModal(e.target.id);
+    }
   });
 
   document.addEventListener('keydown', (e) => {
@@ -872,6 +1513,8 @@ function closeModal(id) {
   const m = document.getElementById(id);
   if (m) m.classList.add('hidden');
 }
+
+window.citizenShieldCloseModal = closeModal;
 
 export function showToast(message, type = 'info', duration = 5000) {
   const shelf = document.getElementById('toast-shelf');

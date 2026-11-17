@@ -89,8 +89,6 @@ export async function apiRegister(name, email, password, phone = "") {
     method: "POST",
     body: JSON.stringify({ name, email, password, phone })
   });
-  setToken(data.token);
-  setCurrentUser(data.user);
   return data;
 }
 
@@ -107,6 +105,38 @@ export async function apiLogout() {
     setToken(null);
     setCurrentUser(null);
   }
+}
+
+// Real AI Vision Detection API
+export async function apiAnalyzeImage(imageFile) {
+  const formData = new FormData();
+  formData.append("image", imageFile);
+  return await request("/api/ai/analyze-image", {
+    method: "POST",
+    body: formData
+  });
+}
+
+// Duplicate Detection Check API
+export async function apiCheckDuplicate(category, latitude, longitude) {
+  return await request("/api/reports/check-duplicate", {
+    method: "POST",
+    body: JSON.stringify({ category, latitude, longitude })
+  });
+}
+
+// Live Colour-Coded Zone Monitoring API
+export async function apiGetZonesSummary() {
+  return await request("/api/zones");
+}
+
+export async function apiGetZoneComplaints(zoneId) {
+  return await request(`/api/zones/${encodeURIComponent(zoneId)}/complaints`);
+}
+
+// AI Dashboard Metrics API
+export async function apiGetAiMetrics() {
+  return await request("/api/ai/metrics");
 }
 
 // Reports API
@@ -144,14 +174,28 @@ export async function apiGetMapPins() {
   return data.pins || [];
 }
 
-export async function apiUpdateReportStatus(reportId, newStatus, remarks, department = "") {
-  return await request(`/api/reports/${encodeURIComponent(reportId)}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({
+export async function apiUpdateReportStatus(reportId, newStatus, remarks, department = "", afterImageFile = null, priority = "") {
+  let body;
+  if (afterImageFile) {
+    const fd = new FormData();
+    fd.append("status", newStatus);
+    fd.append("remarks", remarks);
+    if (department) fd.append("department", department);
+    if (priority) fd.append("priority", priority);
+    fd.append("after_image", afterImageFile);
+    body = fd;
+  } else {
+    body = JSON.stringify({
       status: newStatus,
       remarks,
-      department
-    })
+      department,
+      priority
+    });
+  }
+
+  return await request(`/api/reports/${encodeURIComponent(reportId)}/status`, {
+    method: "PATCH",
+    body: body
   });
 }
 
