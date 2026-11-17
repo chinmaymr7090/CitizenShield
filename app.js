@@ -964,56 +964,65 @@ function setupOfficerConsole() {
   });
 
   // Status Directive Update Modal Submission
-  document.getElementById('btn-save-officer-directive').addEventListener('click', async () => {
-    const reportId = (document.getElementById('officer-update-ref-id').value || '').trim();
-    const newStatus = document.getElementById('officer-select-status').value;
-    const newDept = document.getElementById('officer-select-dept').value;
-    const newPriority = document.getElementById('officer-select-priority').value;
-    const remarks = document.getElementById('officer-text-remarks').value.trim();
-    const btn = document.getElementById('btn-save-officer-directive');
+  const saveBtn = document.getElementById('btn-save-officer-directive');
+  if (saveBtn) {
+    saveBtn.onclick = async (e) => {
+      if (e) e.preventDefault();
+      const reportId = (document.getElementById('officer-update-ref-id').value || '').trim();
+      const newStatus = document.getElementById('officer-select-status').value;
+      const newDept = document.getElementById('officer-select-dept').value;
+      const newPriority = document.getElementById('officer-select-priority').value;
+      const remarks = document.getElementById('officer-text-remarks').value.trim();
+      const btn = document.getElementById('btn-save-officer-directive');
 
-    // Retrieve file directly from input element or state variable
-    const afterPhotoInput = document.getElementById('officer-after-photo');
-    const repairPhotoFile = (afterPhotoInput && afterPhotoInput.files && afterPhotoInput.files[0]) ? afterPhotoInput.files[0] : selectedAfterRepairFile;
+      // Retrieve file directly from input element or state variable
+      const afterPhotoInput = document.getElementById('officer-after-photo');
+      const repairPhotoFile = (afterPhotoInput && afterPhotoInput.files && afterPhotoInput.files[0]) ? afterPhotoInput.files[0] : selectedAfterRepairFile;
 
-    if (!remarks) {
-      showToast("Please provide an official justification and action remark.", "error");
-      return;
-    }
-
-    if (newStatus === 'Resolved' && !repairPhotoFile) {
-      // Check if complaint already has an after repair image in database
-      const foundReport = cachedAdminReports.find(r => (r.report_id === reportId || r.tracking_id === reportId));
-      if (!foundReport || !foundReport.after_repair_image) {
-        showToast("Mandatory: Please attach an after-repair photo before marking as Resolved.", "error");
+      if (!reportId) {
+        showToast("Error: No grievance reference found. Please reopen directive.", "error");
         return;
       }
-    }
 
-    try {
-      btn.disabled = true;
-      btn.textContent = 'Committing Directive...';
-
-      await apiUpdateReportStatus(reportId, newStatus, remarks, newDept, repairPhotoFile, newPriority);
-
-      showToast(`Grievance ${reportId} status updated to ${newStatus}.`, "success");
-      closeModal('modal-officer-action');
-      selectedAfterRepairFile = null;
-      if (afterPhotoInput) afterPhotoInput.value = '';
-      
-      // Refresh Officer Console and Zone Monitoring data seamlessly
-      await loadOfficerConsole();
-      if (typeof loadLiveZoneData === 'function') {
-        loadLiveZoneData();
+      if (!remarks) {
+        showToast("Please provide an official justification and action remark.", "error");
+        return;
       }
-    } catch (err) {
-      console.error("Directive publish failure:", err);
-      showToast(err.message || "Failed to publish directive.", "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Publish Official Directive';
-    }
-  });
+
+      if (newStatus === 'Resolved' && !repairPhotoFile) {
+        // Check if complaint already has an after repair image in database
+        const foundReport = cachedAdminReports.find(r => (r.report_id === reportId || r.tracking_id === reportId));
+        if (!foundReport || !foundReport.after_repair_image) {
+          showToast("Mandatory: Please attach an after-repair photo before marking as Resolved.", "error");
+          return;
+        }
+      }
+
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Committing Directive...';
+
+        await apiUpdateReportStatus(reportId, newStatus, remarks, newDept, repairPhotoFile, newPriority);
+
+        showToast(`Official Directive Published Successfully for ${reportId}.`, "success", 6000);
+        closeModal('modal-officer-action');
+        selectedAfterRepairFile = null;
+        if (afterPhotoInput) afterPhotoInput.value = '';
+        
+        // Refresh Officer Console and Zone Monitoring data seamlessly
+        await loadOfficerConsole();
+        if (typeof fetchAndUpdateZoneData === 'function') {
+          fetchAndUpdateZoneData(false);
+        }
+      } catch (err) {
+        console.error("Directive publish failure:", err);
+        showToast(err.message || "Failed to publish directive.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Publish Official Directive';
+      }
+    };
+  }
 }
 
 async function loadOfficerConsole() {
