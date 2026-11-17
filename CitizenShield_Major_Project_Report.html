@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CitizenShield - Major Project Report (Print to PDF)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Merriweather:ital,wght@0,300;0,700;1,300&display=swap');
+    
+    @page {
+      size: A4;
+      margin: 20mm 15mm 20mm 15mm;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: #1e293b;
+      line-height: 1.6;
+      font-size: 11pt;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    .cover-page {
+      page-break-after: always;
+      text-align: center;
+      padding-top: 60px;
+      padding-bottom: 40px;
+    }
+
+    .institution-header {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #0f766e;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .department-sub {
+      font-size: 12pt;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 40px;
+    }
+
+    .project-title {
+      font-size: 30pt;
+      font-weight: 800;
+      color: #0e3b43;
+      margin: 20px 0 10px 0;
+      line-height: 1.2;
+    }
+
+    .project-subtitle {
+      font-size: 14pt;
+      font-style: italic;
+      color: #0284c7;
+      margin-bottom: 40px;
+    }
+
+    .cover-box {
+      border: 2px solid #0f766e;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 500px;
+      margin: 0 auto 50px auto;
+      background: #f0fdfa;
+      text-align: left;
+    }
+
+    .cover-box p {
+      margin: 6px 0;
+      font-size: 11pt;
+    }
+
+    .section-title {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #0e3b43;
+      border-bottom: 2px solid #0f766e;
+      padding-bottom: 4px;
+      margin-top: 30px;
+      margin-bottom: 12px;
+      page-break-after: avoid;
+    }
+
+    .subsection-title {
+      font-size: 12pt;
+      font-weight: 700;
+      color: #0f766e;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    p {
+      margin: 8px 0;
+      text-align: justify;
+    }
+
+    ul, ol {
+      margin: 8px 0 12px 24px;
+      padding: 0;
+    }
+
+    li {
+      margin-bottom: 5px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 10pt;
+    }
+
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #0f766e;
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .callout-box {
+      background-color: #f0fdfa;
+      border-left: 4px solid #0f766e;
+      padding: 12px 16px;
+      margin: 14px 0;
+      border-radius: 0 4px 4px 0;
+      font-size: 10.5pt;
+    }
+
+    .print-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      background: #0f766e;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 9999;
+    }
+
+    .print-button:hover {
+      background: #115e59;
+    }
+
+    @media print {
+      .print-button {
+        display: none;
+      }
+      body {
+        font-size: 10.5pt;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="print-button" onclick="window.print()">🖨️ Save / Print as PDF</button>
+
+  <!-- COVER PAGE -->
+  <div class="cover-page">
+    <div class="institution-header">Sri Siddhartha School of Engineering</div>
+    <div class="department-sub">Department of Computer Science and Engineering<br>Tumakuru – 572107, Karnataka</div>
+
+    <div style="margin: 40px 0;">
+      <div style="font-size: 14pt; font-weight: 600; color: #64748b; text-transform: uppercase;">Final Year Major Project Report</div>
+      <div class="project-title">CitizenShield</div>
+      <div class="project-subtitle">AI-Powered Civic Grievance Detection &amp; Management System</div>
+    </div>
+
+    <div class="cover-box">
+      <p><strong>Project Title:</strong> CitizenShield Municipal Redressal Directorate</p>
+      <p><strong>Deployment Region:</strong> Tumakuru Mahanagara Palike (35 Wards)</p>
+      <p><strong>Technologies:</strong> Python Flask, YOLOv8 Computer Vision, SQLite, Leaflet GIS</p>
+      <p><strong>Academic Year:</strong> 2026 – 2027</p>
+    </div>
+
+    <div style="font-size: 11pt; color: #475569; margin-top: 40px;">
+      Affiliated to Sri Siddhartha Academy of Higher Education (Deemed to be University)
+    </div>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <h2 class="section-title">Table of Contents</h2>
+  <ol>
+    <li><strong>Introduction</strong> — Project concept, vision, and real-world necessity.</li>
+    <li><strong>Problem Statement</strong> — Operational bottlenecks of traditional helplines and portals.</li>
+    <li><strong>Literature Survey</strong> — Computer vision for civil defect detection &amp; smart city governance.</li>
+    <li><strong>Research / Project Gap</strong> — Missing automated image verification and false closure loopholes.</li>
+    <li><strong>Objectives</strong> — Core system goals and deliverables.</li>
+    <li><strong>Scope of the Project</strong> — Tumakuru City Corporation jurisdiction and municipal departments.</li>
+    <li><strong>Proposed Methodology</strong> — End-to-end 5-step data and verification pipeline.</li>
+    <li><strong>System Design &amp; Architecture</strong> — Multi-tier technology stack and SQLite relational schema.</li>
+    <li><strong>Implementation Details</strong> — Real AI models, Officer Reply module, and 10-stage milestone tracker.</li>
+    <li><strong>Results &amp; Discussion</strong> — Automated 17-step end-to-end test execution results.</li>
+    <li><strong>Conclusion &amp; Future Scope</strong> — Summary and mobile/drone surveillance roadmap.</li>
+    <li><strong>References</strong> — Academic and standard documentation citations.</li>
+  </ol>
+
+  <!-- 1. INTRODUCTION -->
+  <h2 class="section-title">1. Introduction</h2>
+  <p>
+    In simple words, <strong>CitizenShield</strong> is an intelligent municipal website that allows everyday citizens to report urban problems—such as broken roads, potholes, overflowing garbage dumps, pipe leaks, and drainage water—in less than one minute.
+  </p>
+  <p>
+    Unlike traditional government portals that ask citizens to fill out confusing multi-page forms, CitizenShield allows a person to simply snap a photograph on their phone. The computer system uses <strong>Real Artificial Intelligence (Computer Vision)</strong> to inspect the photograph, detect the exact defect, tag the GPS location, and send the complaint directly to the correct municipal engineer.
+  </p>
+
+  <!-- 2. PROBLEM STATEMENT -->
+  <h2 class="section-title">2. Problem Statement</h2>
+  <p>Everyday citizens face major frustrations when reporting civic defects to city councils:</p>
+  <ul>
+    <li><strong>Wrong Department Routing:</strong> Citizens often don't know whether a street issue belongs to the Roads Division, the Water Board, or the Electricity Department (BESCOM). Complaints bounce around for weeks without action.</li>
+    <li><strong>Fake Closures on Paper:</strong> Contractors and field workers often mark complaints as "Resolved" without actually doing the work, leaving citizens frustrated.</li>
+    <li><strong>No Live Updates:</strong> Citizens have no way to know if anyone has visited the site, what the officer's remarks are, or when repair work will begin.</li>
+    <li><strong>Duplicate Dispatches:</strong> Multiple neighbors often report the same pothole on the same road, causing municipal vans to waste time and fuel inspecting the same spot twice.</li>
+  </ul>
+
+  <!-- 3. LITERATURE SURVEY & 4. GAP -->
+  <h2 class="section-title">3. Literature Survey &amp; 4. Project Gap</h2>
+  <p>
+    Modern academic research proves that deep neural networks (specifically YOLOv8 architectures) can identify surface distress like tarmac cracks and potholes with over 80% accuracy in real-world lighting conditions. Furthermore, spatial clustering algorithms (such as Haversine distance calculations) can detect whether two GPS coordinates are within 75 meters of each other.
+  </p>
+  <div class="callout-box">
+    <strong>The Research Gap Identified:</strong> Conventional state e-governance portals (such as generic municipal portals) merely store plain text descriptions. They lack real AI image verification at the time of upload, they do not provide a live visual danger map for city leaders, and critically, they do not enforce a <strong>mandatory post-repair photograph</strong> before closing a case.
+  </div>
+
+  <!-- 5. OBJECTIVES & 6. SCOPE -->
+  <h2 class="section-title">5. Project Objectives &amp; 6. Scope</h2>
+  <p><strong>Primary Objectives:</strong></p>
+  <ol>
+    <li>Implement real deep learning image detection for 5 civic categories: Potholes, Road damage, Garbage accumulation, Drainage overflow, and Water leakage.</li>
+    <li>Eliminate fake complaint closures by strictly requiring officers to upload an <em>after-repair verification photo</em> before marking any complaint as "Resolved".</li>
+    <li>Provide citizens with a clear <strong>10-Stage Vertical Milestone Tracker</strong> and direct official replies from municipal engineers.</li>
+    <li>Generate a live colour-coded GIS map of Tumakuru with Green (Low), Orange (Medium), and Red (High Danger) monitoring zones.</li>
+  </ol>
+  <p>
+    <strong>Project Scope:</strong> The system covers all <strong>35 Administrative Wards of Tumakuru City Corporation</strong> across 4 key departments: Roads &amp; Civil Infrastructure, BESCOM Public Lighting, KUWSDB Water Supply &amp; Sewerage, and Solid Waste Management.
+  </p>
+
+  <!-- 7. METHODOLOGY & 8. SYSTEM DESIGN -->
+  <h2 class="section-title">7. Methodology &amp; 8. System Design</h2>
+  <p>CitizenShield operates on a clean 5-step operational pipeline:</p>
+  <ol>
+    <li><strong>Citizen Lodgment:</strong> Citizen captures a photo; browser acquires GPS coordinates via HTML5 Geolocation API.</li>
+    <li><strong>AI Vision Analysis:</strong> YOLOv8 neural network and OpenCV spectral filters scan the image and determine category and severity.</li>
+    <li><strong>Proximity &amp; Duplicate Check:</strong> System checks if another active grievance exists within 75 meters to prevent duplicate crew dispatches.</li>
+    <li><strong>Officer Action &amp; Reply:</strong> Assigned officer views evidence, AI confidence score, and dispatches a repair crew while posting an official reply.</li>
+    <li><strong>Verified Resolution:</strong> Officer attaches a photo of the completed repair. The citizen's tracking page immediately updates to "Resolved".</li>
+  </ol>
+
+  <!-- 9. IMPLEMENTATION -->
+  <h2 class="section-title">9. Implementation Details</h2>
+  <div class="callout-box">
+    <strong>Key Architectural Features:</strong>
+    <ul>
+      <li><strong>Multi-threaded Production Server:</strong> Powered by Python Flask and Waitress WSGI server for zero downtime.</li>
+      <li><strong>Real AI Models:</strong> Custom-weighted YOLOv8 networks (<code>pothole_yolov8n.pt</code>, <code>road_distress_yolov8n.pt</code>, <code>garbage_yolov8n.pt</code>) + OpenCV Hydrological Analyzer.</li>
+      <li><strong>Official Officer Directives:</strong> Direct officer-to-citizen messaging with instant in-app notification alerts.</li>
+      <li><strong>10-Stage Progress Pipeline:</strong> From <em>1. Submitted</em> $\rightarrow$ <em>4. Officer Assigned</em> $\rightarrow$ <em>8. Repair Started</em> $\rightarrow$ <em>9. Resolved</em>.</li>
+      <li><strong>Strict Privacy (RBAC):</strong> Unauthorized citizens receive HTTP 403 Forbidden if trying to inspect another person's private grievance.</li>
+    </ul>
+  </div>
+
+  <!-- 10. RESULTS -->
+  <h2 class="section-title">10. Results &amp; Discussion</h2>
+  <p>
+    The system was subjected to an automated 17-step end-to-end verification test suite (<code>test_full_workflow.py</code>) running on <code>http://127.0.0.1:5000</code>. All 17 verification points passed with 100% success rate:
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Test Step</th>
+        <th>Description</th>
+        <th>System Verification</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Test 1 – 5</td>
+        <td>Citizen registration, AI photo analysis, GPS tagging &amp; SQLite lodgment</td>
+        <td>Tracking ID CS-2026-66737 generated; YOLOv8 detected road distress (75% conf)</td>
+        <td><strong>PASS</strong></td>
+      </tr>
+      <tr>
+        <td>Test 6 – 10</td>
+        <td>Officer login, evidence review, directive reply &amp; status update to 'In Progress'</td>
+        <td>Record saved in <code>officer_replies</code> &amp; <code>status_history</code>; audit logged</td>
+        <td><strong>PASS</strong></td>
+      </tr>
+      <tr>
+        <td>Test 11 – 14</td>
+        <td>Citizen tracking dossier, 10-stage vertical milestone pipeline &amp; notification bell</td>
+        <td>Milestone step 8 active; latest engineer reply displayed; in-app alert delivered</td>
+        <td><strong>PASS</strong></td>
+      </tr>
+      <tr>
+        <td>Test 15 – 16</td>
+        <td>Grievance resolution with mandatory post-repair verification photo</td>
+        <td>Photo saved; ticket marked 'Resolved'; citizen sees before/after evidence</td>
+        <td><strong>PASS</strong></td>
+      </tr>
+      <tr>
+        <td>Test 17</td>
+        <td>Data security and privacy authorization check</td>
+        <td>Unauthorized citizen blocked with HTTP 403 Forbidden</td>
+        <td><strong>PASS</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 11. CONCLUSION -->
+  <h2 class="section-title">11. Conclusion &amp; Future Scope</h2>
+  <p>
+    CitizenShield demonstrates that modern web systems and artificial intelligence can eliminate bureaucratic delays in city councils. By introducing automated defect recognition, mandatory photographic proof for completed work, and direct communication between engineers and citizens, the platform restores transparency and accountability to municipal governance.
+  </p>
+  <p>
+    <strong>Future Scope:</strong> In the next phase, the platform can be extended with native Android and iOS mobile applications, automated drone-based aerial road scanning, and an AI-driven WhatsApp chatbot for senior citizens.
+  </p>
+
+  <!-- 12. REFERENCES -->
+  <h2 class="section-title">12. References</h2>
+  <ol>
+    <li>Ultralytics YOLOv8 Deep Learning Computer Vision Documentation (2024).</li>
+    <li>J. Redmon et al., <em>"You Only Look Once: Unified, Real-Time Object Detection,"</em> IEEE CVPR.</li>
+    <li>Leaflet GIS and OpenStreetMap Interactive Spatial Mapping Protocols.</li>
+    <li>Miguel Grinberg, <em>"Flask Web Development: Developing Web Applications with Python,"</em> O'Reilly Media.</li>
+    <li>Centralized Public Grievance Redress and Monitoring System (CPGRAMS) Guidelines, DARPG, Government of India.</li>
+  </ol>
+
+</body>
+</html>
